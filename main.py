@@ -1,10 +1,12 @@
-from datetime import datetime
+from fastapi import FastAPI
+import sqlite3
 
-current_time = datetime.now()
-print(current_time)
-
-def readSchedule():
-    return 0
-
-def serviceInit():
-    print("Service Initialized")
+def initDB():
+    conn = sqlite3.connect('schedules.db')
+    cursor = conn.cursor()
+    conn.close()
+    
+app = FastAPI()
+@app.get("/")
+def root():
+    return {"message": "Hello, World!"}
