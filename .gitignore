@@ -1,6 +1,6 @@
 #Spinitron SQLite user data
-.db
-.env
+*.db
+*.env
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

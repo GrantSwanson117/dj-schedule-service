@@ -1,8 +1,12 @@
-#Get OS environment
 FROM python:3.14-slim
 
-WORKDIR /dj-schedule-service
+# Install uv.
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-CMD ["bash"]
+COPY . /app
 
-COPY . .
+WORKDIR /app
+RUN uv sync --frozen --no-cache
+
+# Run the FastAPI app.
+CMD ["/app/.venv/bin/fastapi", "run", "app/main.py", "--port", "80", "--host", "0.0.0.0"]
