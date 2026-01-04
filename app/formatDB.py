@@ -80,7 +80,6 @@ def setTimeslots():
                 (start, end, rowid)
             )
     print("Timeslots set.")
-
 def setDayIDs():
     dayIDs = {
         'monday': 0,
@@ -96,6 +95,19 @@ def setDayIDs():
         cursor.execute('UPDATE shows SET "Day_ID" = ? WHERE "Day" = ?', (id, day))
     print("Day IDs set.")
 
+def migrateToNewDB():
+    cursor.execute(f"ATTACH DATABASE 'formatted_schedule.db' AS target")
+    
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS target.shows (
+            show_name T`    EXT,
+            new_dj TEXT,
+            day_id INTEGER,
+            start_time INTEGER,
+            end_time INTEGER
+        );
+    """)
+    
 requiredColumns = ["day", "timeslot", "show title", "dj name"]
 newColumns = ["Start_Time", "End_Time", "Day_ID"]
 
