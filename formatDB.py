@@ -100,7 +100,7 @@ def migrateToNewDB():
     
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS target.shows (
-            show_name T`    EXT,
+            show_name TEXT,
             new_dj TEXT,
             day_id INTEGER,
             start_time INTEGER,
@@ -119,5 +119,7 @@ def formatDB(filename):
     setTimeslots()
     setDayIDs()
     conn.commit()
-    cursor.execute("VACUUM;")
-    conn.close()
+    #cursor.execute("VACUUM;")
+    #conn.close()
+
+
