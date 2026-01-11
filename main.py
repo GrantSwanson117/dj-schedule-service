@@ -22,17 +22,21 @@ API_BASE_URL = 'https://api.spotify.com/v1'
 db = QueryService('schedule.db')
 db.dbFormat()
 app = FastAPI()
-app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY", "a_very_secret_key"))
+app.add_middleware(SessionMiddleware, secret_key=os.getenv("SPOTIFY_SECRET_KEY"))
 
 @app.get("/login")
 async def login():
-    scope = "user-read-currently-playing"
+    scopes = [
+        "user-read-currently-playing",
+        "user-read-recently-played"
+    ]
+    
     params = {
         'client_id': CLIENT_ID,
         'response_type': 'code',
-        'scope': scope,
+        'scope': " ".join(scopes),
         'redirect_uri': REDIRECT_URI,
-        'show_dialog': 'true'
+        'show_dialog': 'false'
     }
     auth_link = f"{AUTH_URL}?{urllib.parse.urlencode(params)}"
     return RedirectResponse(auth_link)
@@ -62,9 +66,9 @@ async def callback(request: Request):
     request.session['refresh_token'] = token_info.get('refresh_token')
     request.session['expires_at'] = datetime.now().timestamp() + token_info.get('expires_in', 3600)
     
-    return RedirectResponse(url="/current-track")
+    return RedirectResponse(url="/tracks/current")
 
-@app.get("/current-track")
+@app.get("/tracks/current/")
 async def current_track(request: Request):
     access_token = request.session.get('access_token')
     expires_at = request.session.get('expires_at')
@@ -87,7 +91,7 @@ async def current_track(request: Request):
     data = response.json()
     item = data.get('item')
     if not item:
-        return {"message": "Could not retrieve track info"}
+        return {"message": "Unable to retrieve track info"}
 
     return {
         "id": item.get('id'),
@@ -103,7 +107,6 @@ async def refreshToken(request: Request):
     if not refresh_token:
         return RedirectResponse('/login')
     
-    # Expiration logic check
     async with httpx.AsyncClient() as client:
         response = await client.post(
             TOKEN_URL,
@@ -117,23 +120,42 @@ async def refreshToken(request: Request):
         
     new_token_info = response.json()
     
-    # Update the session with new token and new expiry
     request.session['access_token'] = new_token_info.get('access_token')
     request.session['expires_at'] = datetime.now().timestamp() + new_token_info.get('expires_in', 3600)
 
-    return RedirectResponse("/current-track")
+    return RedirectResponse("/tracks/current")
 
-@app.get("/show/now/")
+@app.get("/shows/current/")
 def getCurrentShow():
     return db.dbCurrentShow()
 
-@app.get("/show/next/")
+@app.get("/shows/next/")
 def getNextShow():
     return db.dbNextShow()
 
-@app.get("/songs/previous/{amount}")
-def getPreviousSongs(amount: int):
-    return db.dbPreviousSongs(amount)
+@app.get("/tracks/recent/{amount}")
+async def get_recent_tracks(amount: int, request: Request):
+    token = request.session.get('access_token')
+    if not token:
+        return RedirectResponse(url="/login")
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            "https://api.spotify.com/v1/me/player/recently-played",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        data = response.json()
+    
+    recentTracks = []
+    for item in data.get('items', []):
+        track = item.get('track')
+        recentTracks.append({
+            "name": track.get('name'),
+            "artists": [song['name'] for song in track.get('artists', [])],
+            "played_at": item.get('played_at'),
+            "id": track.get('id')
+        })
+    return recentTracks
 
 @app.post("/upload-schedule/")
 def upload_schedule(file):

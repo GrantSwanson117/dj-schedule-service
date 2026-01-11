@@ -5,6 +5,8 @@ from pathlib import Path
 global cursor
 conn = None
 
+
+
 def addNewColumns(columnList):
     cursor.execute(f"PRAGMA table_info('shows');")
     columns = [row[1] for row in cursor.fetchall()]
@@ -70,6 +72,8 @@ def toDatetime(time_tuple, ampm):
 
 def setTimeslots():
     rows = cursor.execute("SELECT rowid, Timeslot FROM shows;").fetchall()
+    cursor.execute("UPDATE shows SET Timeslot = REPLACE(Timeslot, ' ', '')")
+
 
     for rowid, timeslot in rows:
         normalized = normalizeTime(timeslot)
@@ -90,7 +94,7 @@ def setDayIDs():
         'saturday': 5,
         'sunday': 6
     }
-    cursor.execute("UPDATE shows SET Day = LOWER(REPLACE(Day, ' ', ''))")
+    cursor.execute("UPDATE shows SET Day = LOWER(TRIM(Day))")
     for day, id in dayIDs.items():
         cursor.execute('UPDATE shows SET "Day_ID" = ? WHERE "Day" = ?', (id, day))
     print("Day IDs set.")
