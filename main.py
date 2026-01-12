@@ -89,15 +89,18 @@ async def current_track(request: Request):
         return {"message": "No track currently playing"}
     
     data = response.json()
-    item = data.get('item')
-    if not item:
+    track = data.get('item')
+    if not track:
         return {"message": "Unable to retrieve track info"}
-
+    images = track.get('album', {}).get('images', [])
+    releaseDate = track.get('album', {}).get('release_date', [])
     return {
-        "id": item.get('id'),
-        "name": item.get('name'),
-        "artists": ", ".join([artist['name'] for artist in item.get('artists', [])]),
-        "link": item.get('external_urls', {}).get('spotify')
+        "id": track.get('id'),
+        "name": track.get('name'),
+        "artists": ", ".join([artist['name'] for artist in track.get('artists', [])]),
+        "link": track.get('external_urls', {}).get('spotify'),
+        "image": images[0]['url'] if images else None,
+        "release_date": releaseDate.split("-")[0] if releaseDate else None,
     }
 
 @app.get("/refresh-token")
@@ -133,8 +136,9 @@ def getCurrentShow():
 def getNextShow():
     return db.dbNextShow()
 
+#Amount is capped at 20
 @app.get("/tracks/recent/{amount}")
-async def get_recent_tracks(amount: int, request: Request):
+async def get_recent_tracks(request: Request, amount: int):
     token = request.session.get('access_token')
     if not token:
         return RedirectResponse(url="/login")
@@ -145,14 +149,18 @@ async def get_recent_tracks(amount: int, request: Request):
             headers={"Authorization": f"Bearer {token}"}
         )
         data = response.json()
-    
+
     recentTracks = []
-    for item in data.get('items', []):
+    for item in data.get('items', [])[0:amount]:
         track = item.get('track')
+        images = track.get('album', {}).get('images', [])
+        releaseDate = track.get('album', {}).get('release_date', [])
         recentTracks.append({
             "name": track.get('name'),
             "artists": [song['name'] for song in track.get('artists', [])],
             "played_at": item.get('played_at'),
+            "image": images[0]['url'] if images else None,
+            "release_date": releaseDate.split("-")[0] if releaseDate else None,
             "id": track.get('id')
         })
     return recentTracks
@@ -161,3 +169,4 @@ async def get_recent_tracks(amount: int, request: Request):
 def upload_schedule(file):
     formatDB(file.filename)
     return {"status": "Schedule uploaded successfully"}
+

@@ -63,8 +63,8 @@ def normalizePart(part):
 
     return int(h), int(m)
 
-def toDatetime(time_tuple, ampm):
-    h, m = time_tuple
+def toDatetime(timeTuple, ampm):
+    h, m = timeTuple
     
     if ampm == 'pm' and h != 12:h += 12
     if ampm == 'am' and h == 12: h = 0
@@ -123,7 +123,6 @@ def formatDB(filename):
     setTimeslots()
     setDayIDs()
     conn.commit()
-    #cursor.execute("VACUUM;")
-    #conn.close()
+    conn.close()
 
 

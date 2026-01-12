@@ -1,19 +1,6 @@
 import sqlite3
 from datetime import datetime
-from pydantic import BaseModel, Field
 import formatDB
-
-class Show(BaseModel):
-    dj_name: str = Field(alias="DJ Name")
-    show_name: str = Field(alias="Show Name")
-    day_id: int = Field(alias="Day_ID")
-    start_time: int = Field(alias="Start_Time")
-    end_time: int = Field(alias="End_Time")
-
-class Song(BaseModel):
-    title: str
-    artist: str
-    album: str
 
 class QueryService:
 
@@ -22,8 +9,12 @@ class QueryService:
         self.conn.row_factory = sqlite3.Row
         self.cursor = self.conn.cursor()
         self.filename = newFilename
+        self.automationDJ = "KSCU Bot"
+        self.automationShow = "KSCU Autoplay"
 
-        #self.cursor.execute('''ALTER TABLE shows RENAME COLUMN "Timeslot " TO "Timeslot"''')
+    def close(self):
+        if self.conn:
+            self.conn.close()
 
     def dbTime(self):
         normalizedTime = datetime.now().hour * 60 + datetime.now().minute
@@ -32,30 +23,30 @@ class QueryService:
         normalizedDay = datetime.now().weekday()
         return normalizedDay
     
-    def dbCurrentShow(self) -> list[Show]:
+    def dbCurrentShow(self):
         weekday = self.dbWeekday()
-        current_time = self.dbTime()
+        currentTime = self.dbTime()
         
-        print(f"DEBUG: Weekday={weekday}, Time={current_time}")
+        print(f"DEBUG: Weekday={weekday}, Time={currentTime}")
         
         self.cursor.execute(
-            "SELECT * FROM shows WHERE Day_ID = ? AND Start_Time <= ? AND End_Time > ?", 
-            (weekday, current_time, current_time)
+            "SELECT rowid, * FROM shows WHERE Day_ID = ? AND Start_Time <= ? AND End_Time > ?", 
+            (weekday, currentTime, currentTime)
         )
         shows = self.cursor.fetchall()
-        for show in shows:print(show)
-        if not shows: return "bruh"
+        if not shows: 
+            return self.getAutoplay()
         elif len(shows) > 1: return self.handleCohosts(shows)
-        return shows
+        return list(shows)
 
     def handleCohosts(self, showList):
         
         firstShow = dict(showList[0])
-        djList = []
+        djList = [firstShow["DJ Name"]]
         
         for show in showList[1:]:
             if show["Show Title"] != firstShow["Show Title"]:
-                return "Show scheduling error: Multiple shows in the same timeslot."
+                raise ValueError("Show scheduling error: Multiple shows in the same timeslot.")
             elif show["DJ Name"] != firstShow["DJ Name"]:
                 djList.append(show["DJ Name"])
         cohostString = ', '.join(djList)
@@ -71,5 +62,39 @@ class QueryService:
         for row in rows:
             print(f"Day: {row['Day_ID']} | Show: {row['Show Title']} | DJ: {row['DJ Name']} | Start Time: {row['Start_Time']} End Time: {row['End_Time']}")
     
-    def dbNextShow(self) -> list[Show]:
-        pass
+    def getAutoplay(self):
+        return {
+                "Show Title": self.automationShow,
+                "DJ Name": self.automationDJ
+                }
+    def dbNextShow(self):
+        currentShow = self.dbCurrentShow()
+        if not currentShow: return self.getAutoplay()
+
+        day = currentShow[0]["Day_ID"]
+        start = currentShow[0]["Start_Time"]
+
+        self.cursor.execute(
+            """
+            SELECT Day_ID, Start_Time FROM shows WHERE (Day_ID > ?)
+            OR (Day_ID = ? AND Start_Time > ?) ORDER BY Day_ID, Start_Time LIMIT 1
+            """,
+            (day, day, start)
+        )
+        slot = self.cursor.fetchone()
+
+        if slot is None:
+            self.cursor.execute(
+                """SELECT Day_ID, Start_Time FROM shows
+                ORDER BY Day_ID, Start_Time LIMIT 1"""
+            )
+            slot = self.cursor.fetchone()
+
+        self.cursor.execute(
+            """ SELECT * FROM shows WHERE Day_ID = ? AND Start_Time = ?""",
+            (slot["Day_ID"], slot["Start_Time"])
+        )
+        rows = self.cursor.fetchall()
+
+        return self.handleCohosts(rows)
+
