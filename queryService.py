@@ -51,10 +51,10 @@ class QueryService:
         shows = self.cursor.fetchall()
         if not shows: 
             return self.getAutoplay()
-        elif len(shows) > 1: return self.handleCohosts(shows)
         return self.handleCohosts(shows)
 
     def handleCohosts(self, showList):
+        if not showList: return self.getAutoplay()
         firstShow = dict(showList[0])
         djList = [firstShow["DJ Name"]]
         nameList = [firstShow["Name"]]
@@ -77,7 +77,7 @@ class QueryService:
         formatDB.formatDB(self.filename)
 
     def grammaticalJoin(self, list):
-        cleanedList = [i.strip() for i in list if i is not None]
+        cleanedList = [i.strip() for i in list if i]
         return ", ".join(cleanedList[:-2] + [" and ".join(cleanedList[-2:])])
     
     def display(self):
@@ -93,31 +93,38 @@ class QueryService:
                 }
     
     def dbNextShow(self):
-        currentShow = self.dbCurrentShow()
-        if not currentShow: return self.getAutoplay()
+        day = self.dbWeekday()
+        start = self.dbTime()
 
-        day = currentShow["Day_ID"]
-        start = currentShow["Start_Time"]
+        valid_filter = 'AND "Show Title" IS NOT NULL AND "Show Title" != "" AND "Show Title" != ?'
 
+        # Query 1: Find the next valid slot
         self.cursor.execute(
-            """
-            SELECT Day_ID, Start_Time FROM shows WHERE (Day_ID > ?)
-            OR (Day_ID = ? AND Start_Time > ?) ORDER BY Day_ID, Start_Time LIMIT 1
+            f"""
+            SELECT Day_ID, Start_Time FROM shows 
+            WHERE ((Day_ID > ?) OR (Day_ID = ? AND Start_Time > ?))
+            {valid_filter}
+            ORDER BY Day_ID, Start_Time LIMIT 1
             """,
-            (day, day, start)
+            (day, day, start, self.automationShow)
         )
         slot = self.cursor.fetchone()
 
+        # Query 2: Wrap around if nothing left this week
         if slot is None:
             self.cursor.execute(
-                """SELECT Day_ID, Start_Time FROM shows
-                ORDER BY Day_ID, Start_Time LIMIT 1"""
+                f'SELECT Day_ID, Start_Time FROM shows WHERE 1=1 {valid_filter} ORDER BY Day_ID, Start_Time LIMIT 1',
+                (self.automationShow,)
             )
             slot = self.cursor.fetchone()
 
+        if slot is None:
+            return self.getAutoplay()
+
+        # Query 3: Fetch the actual rows
         self.cursor.execute(
-            """ SELECT rowid, * FROM shows WHERE Day_ID = ? AND Start_Time = ?""",
-            (slot["Day_ID"], slot["Start_Time"])
+            f'SELECT rowid, * FROM shows WHERE Day_ID = ? AND Start_Time = ? {valid_filter}',
+            (slot["Day_ID"], slot["Start_Time"], self.automationShow)
         )
         rows = self.cursor.fetchall()
 
