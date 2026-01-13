@@ -11,13 +11,11 @@ from queryService import QueryService
 
 load_dotenv()
 
-CLIENT_ID = os.getenv("CLIENT_ID").strip()
-CLIENT_SECRET = os.getenv("CLIENT_SECRET").strip()
-REDIRECT_URI = os.getenv("REDIRECT_URI").strip().replace("'", "")
-
-AUTH_URL = 'https://accounts.spotify.com/authorize'
-TOKEN_URL = 'https://accounts.spotify.com/api/token'
-API_BASE_URL = 'https://api.spotify.com/v1'
+tokenURL = os.getenv("TOKEN_URL").strip()
+clientID = os.getenv("CLIENT_ID").strip()
+clientSecret = os.getenv("CLIENT_SECRET").strip()
+authURL = os.getenv("AUTH_URL").strip()
+redirectURI = os.getenv("REDIRECT_URI").strip()
 
 db = QueryService('schedule.db')
 db.dbFormat()
@@ -27,97 +25,34 @@ app.add_middleware(SessionMiddleware, secret_key=os.getenv("SPOTIFY_SECRET_KEY")
 @app.get("/login")
 async def login():
     scopes = [
-        "user-read-currently-playing",
-        "user-read-recently-played"
-    ]
-    
+    "user-read-currently-playing",
+    "user-read-recently-played"
+]
     params = {
-        'client_id': CLIENT_ID,
+        'client_id': clientID,
         'response_type': 'code',
         'scope': " ".join(scopes),
-        'redirect_uri': REDIRECT_URI,
+        'redirect_uri': redirectURI,
         'show_dialog': 'false'
     }
-    auth_link = f"{AUTH_URL}?{urllib.parse.urlencode(params)}"
-    return RedirectResponse(auth_link)
-
-@app.get("/callback")
-async def callback(request: Request):
-    code = request.query_params.get('code')
-    error = request.query_params.get('error')
-
-    if error:
-        return {"error": error}
-    
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            TOKEN_URL,
-            data={
-                'grant_type': 'authorization_code',
-                'code': code,
-                'redirect_uri': REDIRECT_URI,
-                'client_id': CLIENT_ID,
-                'client_secret': CLIENT_SECRET,
-            }
-        )
-    
-    token_info = response.json()
-    request.session['access_token'] = token_info.get('access_token')
-    request.session['refresh_token'] = token_info.get('refresh_token')
-    request.session['expires_at'] = datetime.now().timestamp() + token_info.get('expires_in', 3600)
-    
-    return RedirectResponse(url="/tracks/current")
-
-@app.get("/tracks/current/")
-async def current_track(request: Request):
-    access_token = request.session.get('access_token')
-    expires_at = request.session.get('expires_at')
-
-    if not access_token:
-        return RedirectResponse(url="/login")
-    
-    if expires_at and datetime.now().timestamp() > expires_at:
-        return RedirectResponse('/refresh-token')
-    
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            f"{API_BASE_URL}/me/player/currently-playing",
-            headers={"Authorization": f"Bearer {access_token}"}
-        )
-
-    if response.status_code == 204:
-        return {"message": "No track currently playing"}
-    
-    data = response.json()
-    track = data.get('item')
-    if not track:
-        return {"message": "Unable to retrieve track info"}
-    images = track.get('album', {}).get('images', [])
-    releaseDate = track.get('album', {}).get('release_date', [])
-    return {
-        "id": track.get('id'),
-        "name": track.get('name'),
-        "artists": ", ".join([artist['name'] for artist in track.get('artists', [])]),
-        "link": track.get('external_urls', {}).get('spotify'),
-        "image": images[0]['url'] if images else None,
-        "release_date": releaseDate.split("-")[0] if releaseDate else None,
-    }
+    auth_link = f"{authURL}?{urllib.parse.urlencode(params)}"
+    return RedirectResponse(auth_link)  
 
 @app.get("/refresh-token")
 async def refreshToken(request: Request):
     refresh_token = request.session.get('refresh_token')
-    
+        
     if not refresh_token:
         return RedirectResponse('/login')
-    
+        
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            TOKEN_URL,
+            tokenURL,
             data={
                 'grant_type': 'refresh_token',
                 'refresh_token': refresh_token,
-                'client_id': CLIENT_ID,
-                'client_secret': CLIENT_SECRET
+                'client_id': clientID,
+                'client_secret': clientSecret
             }
         )
         
@@ -128,45 +63,28 @@ async def refreshToken(request: Request):
 
     return RedirectResponse("/tracks/current")
 
+@app.get("/callback")
+async def callback(request: Request):
+    return await db.dbCallback(request)
+
+@app.get("/tracks/current/")
+async def currentTrack(request: Request):
+    return await db.dbCurrentTrack(request)
+
+#Returns 20 most recent tracks
+@app.get("/tracks/recent/")
+async def get_recent_tracks(request: Request):
+    return await db.dbGetRecentTracks(request)
+
+@app.post("/upload-schedule/")
+def uploadSchedule(file):
+    formatDB(file.filename)
+    return {"status": "Schedule uploaded successfully"}
+
 @app.get("/shows/current/")
 def getCurrentShow():
     return db.dbCurrentShow()
 
 @app.get("/shows/next/")
 def getNextShow():
-    return db.dbNextShow()
-
-#Amount is capped at 20
-@app.get("/tracks/recent/{amount}")
-async def get_recent_tracks(request: Request, amount: int):
-    token = request.session.get('access_token')
-    if not token:
-        return RedirectResponse(url="/login")
-
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            "https://api.spotify.com/v1/me/player/recently-played",
-            headers={"Authorization": f"Bearer {token}"}
-        )
-        data = response.json()
-
-    recentTracks = []
-    for item in data.get('items', [])[0:amount]:
-        track = item.get('track')
-        images = track.get('album', {}).get('images', [])
-        releaseDate = track.get('album', {}).get('release_date', [])
-        recentTracks.append({
-            "name": track.get('name'),
-            "artists": [song['name'] for song in track.get('artists', [])],
-            "played_at": item.get('played_at'),
-            "image": images[0]['url'] if images else None,
-            "release_date": releaseDate.split("-")[0] if releaseDate else None,
-            "id": track.get('id')
-        })
-    return recentTracks
-
-@app.post("/upload-schedule/")
-def upload_schedule(file):
-    formatDB(file.filename)
-    return {"status": "Schedule uploaded successfully"}
-
+    return db.dbNextShow()    
