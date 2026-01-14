@@ -22,6 +22,9 @@ db.dbFormat()
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("SPOTIFY_SECRET_KEY"))
 
+@app.get("/healthcheck")
+def healthCheck(): return {"Status:": "OK"}
+
 @app.get("/login")
 async def login():
     scopes = [

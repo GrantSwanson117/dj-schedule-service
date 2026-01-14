@@ -4,11 +4,8 @@ import formatDB
 import os
 import httpx
 from datetime import datetime
-import urllib.parse
-from fastapi import FastAPI, Request
+from fastapi import Request
 from fastapi.responses import RedirectResponse
-from starlette.middleware.sessions import SessionMiddleware
-from dotenv import load_dotenv
 
 class QueryService:
 
@@ -184,7 +181,7 @@ class QueryService:
         return {
             "id": track.get('id'),
             "name": track.get('name'),
-            "artists": ", ".join([artist['name'] for artist in track.get('artists', [])]),
+            "artists": self.grammaticalJoin([song['name'] for song in track.get('artists', [])]),
             "link": track.get('external_urls', {}).get('spotify'),
             "image": images[0]['url'] if images else None,
             "release_date": releaseDate.split("-")[0] if releaseDate else None,
@@ -202,16 +199,25 @@ class QueryService:
             data = response.json()
 
         recentTracks = []
+        #Using a set to avoid duplicate songs. Check if ID was already added to set, and
+        #skip if yes.
+        seenIDs = set()
+
         for item in data.get('items', []):
             track = item.get('track')
+            if track.get('id') in seenIDs:
+                continue
             images = track.get('album', {}).get('images', [])
             releaseDate = track.get('album', {}).get('release_date', [])
             recentTracks.append({
                 "name": track.get('name'),
                 "artists": self.grammaticalJoin([song['name'] for song in track.get('artists', [])]),
+                "link": track.get('external_urls', {}).get('spotify'),
                 "played_at": item.get('played_at'),
                 "image": images[0]['url'] if images else None,
                 "release_date": releaseDate.split("-")[0] if releaseDate else None,
                 "id": track.get('id')
             })
+            seenIDs.add(track.get('id'))
+            if len(recentTracks) >= 10: break
         return recentTracks
