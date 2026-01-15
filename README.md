@@ -1,7 +1,7 @@
 # kscu-web-server
 
-Developed by @GrantSwanson117
-[Show Recorder](https://example.com) logic by @colinfriedel, adapted to fit this project
+Developed by [GrantSwanson117](https://github.com/GrantSwanson117)<br>
+[Show Recorder](https://github.com/colinfriedel/KSCURecorder2025) logic by [colinfriedel](https://github.com/colinfriedel), adapted to fit this project
 
 A containerized backend and automation service for KSCU 103.3FM, the student-ran radio station for Santa Clara University. Features include:
 
