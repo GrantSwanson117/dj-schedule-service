@@ -42,7 +42,7 @@ class QueryService:
         print(f"DEBUG: Weekday={weekday}, Time={currentTime}")
         
         self.cursor.execute(
-            "SELECT rowid, * FROM shows WHERE Day_ID = ? AND Start_Time <= ? AND End_Time > ?", 
+            "SELECT rowid, * FROM shows WHERE day_id = ? AND start_time <= ? AND end_time > ?", 
             (weekday, currentTime, currentTime)
         )
         shows = self.cursor.fetchall()
@@ -53,21 +53,21 @@ class QueryService:
     def handleCohosts(self, showList):
         if not showList: return self.getAutoplay()
         firstShow = dict(showList[0])
-        djList = [firstShow["DJ Name"]]
-        nameList = [firstShow["Name"]]
-        emailList = [firstShow["Email"]]
+        djList = [firstShow["dj_name"]]
+        nameList = [firstShow["name"]]
+        emailList = [firstShow["email"]]
         
         for show in showList[1:]:
-            if show["Show Title"] != firstShow["Show Title"]:
+            if show["show_title"] != firstShow["show_title"]:
                 raise ValueError("Show scheduling error: Multiple shows in the same timeslot.")
-            elif show["DJ Name"] != firstShow["DJ Name"]:
-                djList.append(show["DJ Name"])
-                emailList.append(show["Email"])
-                nameList.append(show["Name"])
+            elif show["dj_name"] != firstShow["dj_name"]:
+                djList.append(show["dj_name"])
+                emailList.append(show["email"])
+                nameList.append(show["name"])
         
-        firstShow["DJ Name"] = self.grammaticalJoin(djList)
-        firstShow["Name"] = nameList
-        firstShow["Email"] = emailList
+        firstShow["dj_name"] = self.grammaticalJoin(djList)
+        firstShow["name"] = nameList
+        firstShow["email"] = emailList
         return firstShow
 
     def dbFormat(self):
@@ -78,30 +78,30 @@ class QueryService:
         return ", ".join(cleanedList[:-2] + [" and ".join(cleanedList[-2:])])
     
     def display(self):
-        self.cursor.execute('''SELECT "Day_ID", "Show Title", "DJ Name", "Start_Time", "End_Time" FROM shows''')
+        self.cursor.execute('''SELECT "day_id", "show_title", "dj_name", "start_time", "end_time" FROM shows''')
         rows = self.cursor.fetchall()
         for row in rows:
-            print(f"Day: {row['Day_ID']} | Show: {row['Show Title']} | DJ: {row['DJ Name']} | Start Time: {row['Start_Time']} End Time: {row['End_Time']}")
+            print(f"Day: {row['day_id']} | Show: {row['show_title']} | DJ: {row['dj_name']} | Start Time: {row['start_time']} End Time: {row['end_time']}")
     
     def getAutoplay(self):
         return {
-                "Show Title": self.automationShow,
-                "DJ Name": self.automationDJ
+                "show_title": self.automationShow,
+                "dj_name": self.automationDJ
                 }
     
     def dbNextShow(self):
         day = self.dbWeekday()
         start = self.dbTime()
 
-        valid_filter = 'AND "Show Title" IS NOT NULL AND "Show Title" != "" AND "Show Title" != ?'
+        valid_filter = 'AND "show_title" IS NOT NULL AND "show_title" != "" AND "show_title" != ?'
 
         # Query 1: Find the next valid slot
         self.cursor.execute(
             f"""
-            SELECT Day_ID, Start_Time FROM shows 
-            WHERE ((Day_ID > ?) OR (Day_ID = ? AND Start_Time > ?))
+            SELECT day_id, start_time FROM shows 
+            WHERE ((day_id > ?) OR (day_id = ? AND start_time > ?))
             {valid_filter}
-            ORDER BY Day_ID, Start_Time LIMIT 1
+            ORDER BY day_id, start_time LIMIT 1
             """,
             (day, day, start, self.automationShow)
         )
@@ -110,7 +110,7 @@ class QueryService:
         # Query 2: Wrap around if nothing left this week
         if slot is None:
             self.cursor.execute(
-                f'SELECT Day_ID, Start_Time FROM shows WHERE 1=1 {valid_filter} ORDER BY Day_ID, Start_Time LIMIT 1',
+                f'SELECT day_id, start_time FROM shows WHERE 1=1 {valid_filter} ORDER BY day_id, start_time LIMIT 1',
                 (self.automationShow,)
             )
             slot = self.cursor.fetchone()
@@ -120,8 +120,8 @@ class QueryService:
 
         # Query 3: Fetch the actual rows
         self.cursor.execute(
-            f'SELECT rowid, * FROM shows WHERE Day_ID = ? AND Start_Time = ? {valid_filter}',
-            (slot["Day_ID"], slot["Start_Time"], self.automationShow)
+            f'SELECT rowid, * FROM shows WHERE day_id = ? AND start_time = ? {valid_filter}',
+            (slot["day_id"], slot["start_time"], self.automationShow)
         )
         rows = self.cursor.fetchall()
 

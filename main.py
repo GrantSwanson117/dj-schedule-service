@@ -8,6 +8,7 @@ from fastapi.responses import RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 from dotenv import load_dotenv
 from queryService import QueryService
+from recorder import Recorder
 
 load_dotenv()
 
@@ -18,6 +19,7 @@ authURL = os.getenv("AUTH_URL").strip()
 redirectURI = os.getenv("REDIRECT_URI").strip()
 
 db = QueryService('schedule.db')
+rc = Recorder()
 db.dbFormat()
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("SPOTIFY_SECRET_KEY"))

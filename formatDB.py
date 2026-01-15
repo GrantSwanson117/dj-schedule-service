@@ -5,8 +5,6 @@ from pathlib import Path
 global cursor
 conn = None
 
-
-
 def addNewColumns(columnList):
     cursor.execute(f"PRAGMA table_info('shows');")
     columns = [row[1] for row in cursor.fetchall()]
@@ -70,9 +68,9 @@ def toDatetime(timeTuple, ampm):
     if ampm == 'am' and h == 12: h = 0
     return datetime(2000, 1, 1, h, m)
 
-def setTimeslots():
-    rows = cursor.execute("SELECT rowid, Timeslot FROM shows;").fetchall()
-    cursor.execute("UPDATE shows SET Timeslot = REPLACE(Timeslot, ' ', '')")
+def settimeslots():
+    rows = cursor.execute("SELECT rowid, timeslot FROM shows;").fetchall()
+    cursor.execute("UPDATE shows SET timeslot = REPLACE(timeslot, ' ', '')")
 
 
     for rowid, timeslot in rows:
@@ -80,10 +78,10 @@ def setTimeslots():
         if normalized:
             start, end = normalized
             cursor.execute(
-                'UPDATE shows SET "Start_Time" = ?, "End_Time" = ? WHERE rowid = ?',
+                'UPDATE shows SET "start_time" = ?, "end_time" = ? WHERE rowid = ?',
                 (start, end, rowid)
             )
-    print("Timeslots set.")
+    print("timeslots set.")
 def setDayIDs():
     dayIDs = {
         'monday': 0,
@@ -96,31 +94,18 @@ def setDayIDs():
     }
     cursor.execute("UPDATE shows SET Day = LOWER(TRIM(Day))")
     for day, id in dayIDs.items():
-        cursor.execute('UPDATE shows SET "Day_ID" = ? WHERE "Day" = ?', (id, day))
+        cursor.execute('UPDATE shows SET "day_id" = ? WHERE "Day" = ?', (id, day))
     print("Day IDs set.")
 
-def migrateToNewDB():
-    cursor.execute(f"ATTACH DATABASE 'formatted_schedule.db' AS target")
-    
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS target.shows (
-            show_name TEXT,
-            new_dj TEXT,
-            day_id INTEGER,
-            start_time INTEGER,
-            end_time INTEGER
-        );
-    """)
-    
-requiredColumns = ["day", "timeslot", "show title", "dj name"]
-newColumns = ["Start_Time", "End_Time", "Day_ID"]
+requiredColumns = ["day", "timeslot", "show_title", "dj_name"]
+newColumns = ["start_time", "end_time", "day_id"]
 
 def formatDB(filename):
     conn = sqlite3.connect(filename)
     global cursor
     cursor = conn.cursor()
     addNewColumns(newColumns)
-    setTimeslots()
+    settimeslots()
     setDayIDs()
     conn.commit()
     conn.close()
