@@ -12,10 +12,12 @@ import threading
 from botocore.exceptions import NoCredentialsError, ClientError
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
+from queryService import QueryService
 from dotenv import load_dotenv 
 
 class Recorder:
-    def __init__(self):
+
+    def __init__(self, db: QueryService):
         #AWS variables
         self.emailAddress = os.getenv("EMAIL_ADDRESS").strip()
         self.emailPassword = os.getenv("EMAIL_PASSWORD").strip()
@@ -24,14 +26,14 @@ class Recorder:
         self.self.s3bucket = "kscu"
         recordingLock = threading.Lock()
 
-    def is_now_in_show(self, now_time, start_time, end_time):
+    def isNowInShow(self, now_time, start_time, end_time):
         #overnight shows fix
         if start_time <= end_time:
             return start_time <= now_time < end_time
         else:
             return now_time >= start_time or now_time < end_time
 
-    def upload_to_s3(self, filepath, filename):
+    def uploadToS3(self, filepath, filename):
         print(f"Uploading {filename} to S3")
         try:
             self.s3client.upload_file(filepath, self.s3bucket, filename)
@@ -41,13 +43,13 @@ class Recorder:
             print(f"Failed to upload to S3: {e}")
             return False
         
-    def get_s3_fileobj(self, bucket, key):
+    def getS3FileObj(self, bucket, key):
         fileobj = io.BytesIO()
         self.s3client.download_fileobj(bucket, key, fileobj)
         fileobj.seek(0)
         return fileobj
 
-    def get_dj_from_schedule(self, target_time, schedule_file="schedule.json"):
+    def getDjFromSchedule(self, target_time, schedule_file="schedule.json"):
         with open(schedule_file, "r") as f:
             schedule = json.load(f)
 
@@ -63,7 +65,7 @@ class Recorder:
 
         return "Unknown DJ", "Unknown Show", None, None, None
 
-    def get_show_duration_minutes(self, start_time, end_time):
+    def getShowDurationMinutes(self, start_time, end_time):
         fmt = "%H:%M"
         start = datetime.strptime(start_time, fmt)
         end = datetime.strptime(end_time, fmt)
@@ -73,7 +75,7 @@ class Recorder:
 
         return int((end - start).total_seconds() / 60)
 
-    def send_email_with_attachment(self, bucket_name, filename, dj_email, dj_name, show_title, date_str):
+    def sendEmailWithAttachment(self, bucket_name, filename, dj_email, dj_name, show_title, date_str):
         
         url = self.s3client.generate_presigned_url(
             ClientMethod='get_object',
@@ -89,7 +91,6 @@ class Recorder:
     {url}
 
     If there are any issues with this email or the recording, please let us know by sending an email to gm@kscu.org!
-
 
     Thanks for being part of the team!
     Your friends at KSCU The Underground Sound
@@ -107,25 +108,25 @@ class Recorder:
             print(f"Error sending email: {e}")
             return False
         
-    def cleanup_temp_file(self, filepath):
+    def cleanupTempFile(self, filepath):
         try:
             if os.path.exists(filepath):
                 os.remove(filepath)
         except Exception as e:
             print(f"Error deleting temp file {filepath}: {e}")
 
-    def record_show(self):
+    def recordShow(self):
         local_tz = ZoneInfo("America/Los_Angeles")
         recording_start_time = datetime.now(local_tz)
 
-        dj_name, show_title, dj_email, start_time, end_time = self.get_dj_from_schedule(recording_start_time)
+        dj_name, show_title, dj_email, start_time, end_time = self.getDjFromSchedule(recording_start_time)
 
         #skips recording for unknown shows
         if dj_name == "Unknown DJ" or not start_time or not end_time:
             print("No scheduled show found, skipping recording")
             return
 
-        duration_minutes = self.get_show_duration_minutes(start_time, end_time)
+        duration_minutes = self.getShowDurationMinutes(start_time, end_time)
         duration_seconds = duration_minutes * 60
         duration_seconds = max(0, duration_seconds - 10) #little buffer idk if we need it or not
         
@@ -169,10 +170,10 @@ class Recorder:
         # Send email
         try:
             print("Starting upload to S3")
-            if self.upload_to_s3(filepath, filename):
+            if self.uploadToS3(filepath, filename):
                 print("upload succeeded")
                 if (dj_name != "KSCU Bot") and (dj_name != "Unknown DJ"):
-                    if (self.send_email_with_attachment(self.s3bucket, filename, dj_email, dj_name, show_title, now)):
+                    if (self.sendEmailWithAttachment(self.s3bucket, filename, dj_email, dj_name, show_title, now)):
                         print(f"Email sent.")
                         os.remove(filepath)
                         print(f"Deleted local file {filepath}.")
@@ -185,53 +186,53 @@ class Recorder:
         except Exception as e:
             print(f"Failed to send email or upload file: {e}")
         finally:
-            self.cleanup_temp_file(filepath)
+            self.cleanupTempFile(filepath)
         
-    def record_show_safe(self):
+    def recordShowSafe(self):
         if not self.recordingLock.acquire(blocking=False):
             print("Recording in progress, skipping this hour")
             return
         
         try:
-            self.record_show()
+            self.c()
         finally:
             self.recordingLock.release()
 
-    def record_show_threaded(self):
-        threading.Thread(target=self.record_show_safe).start()
+    def recordShowThreaded(self):
+        threading.Thread(target=self.recordShowSafe).start()
 
-    def cleanup_old_temp_files():
+    def cleanupOldTempFiles():
         #cleans old files on startup
         try:
             temp_files = [f for f in os.listdir('/tmp') if f.endswith('.mp3')]
             for temp_file in temp_files:
                 filepath = f"/tmp/{temp_file}"
-                self.cleanup_temp_file(filepath)
+                self.cleanupTempFile(filepath)
             if temp_files:
                 print(f"cleaned up {len(temp_files)} temp files on startup)")
         except Exception as e:
             print(f"error cleaning old files: {e}")
 
-    cleanup_old_temp_files()
+    cleanupOldTempFiles()
 
     last_recorded_show = None
 
-    def check_and_record(self):
+    def checkAndRecord(self):
         global last_recorded_show
         now = datetime.now(ZoneInfo("America/Los_Angeles"))
-        dj_name, show_title, dj_email, start_time, end_time = self.get_dj_from_schedule(now)
+        dj_name, show_title, dj_email, start_time, end_time = self.getDjFromSchedule(now)
 
         now_time = now.strftime("%H:%M")
 
         if dj_name != "Unknown DJ" and start_time and end_time:
             show_id = f"{dj_name}_{show_title}_{start_time}_{end_time}_{now.date()}"
 
-            if self.is_now_in_show(now_time, start_time, end_time) and last_recorded_show != show_id:
+            if self.isNowInShow(now_time, start_time, end_time) and last_recorded_show != show_id:
                 print(f"Recording started for {show_title} ({dj_name})")
-                self.record_show()
+                self.recordShow()
                 last_recorded_show = show_id
                 
-    schedule.every(30).seconds.do(check_and_record)
+    schedule.every(30).seconds.do(checkAndRecord)
 
     print("Scheduler running. Press Ctrl+C to stop.")
     try:

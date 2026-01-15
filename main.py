@@ -18,9 +18,13 @@ clientSecret = os.getenv("CLIENT_SECRET").strip()
 authURL = os.getenv("AUTH_URL").strip()
 redirectURI = os.getenv("REDIRECT_URI").strip()
 
+#Database service instantiation
 db = QueryService('schedule.db')
-rc = Recorder()
 db.dbFormat()
+
+#Show recorder instantiation
+rc = Recorder(db)
+
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("SPOTIFY_SECRET_KEY"))
 
