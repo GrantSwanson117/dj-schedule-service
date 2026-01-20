@@ -14,8 +14,9 @@ class QueryService:
         self.conn.row_factory = sqlite3.Row
         self.cursor = self.conn.cursor()
         self.filename = newFilename
-        self.automationDJ = "KSCU Bot"
-        self.automationShow = "KSCU Autoplay"
+
+        self.automationDJ: str = os.getenv("AUTOMATION_DJ").strip()
+        self.automationShow: str = os.getenv("AUTOMATION_SHOW").strip()
 
         self.clientID = os.getenv("CLIENT_ID").strip()
         self.clientSecret = os.getenv("CLIENT_SECRET").strip()
@@ -28,10 +29,12 @@ class QueryService:
         if self.conn:
             self.conn.close()
 
-    def dbTime(self):
+    @staticmethod
+    def dbTime():
         return datetime.now().hour * 60 + datetime.now().minute
         
-    def dbWeekday(self):
+    @staticmethod
+    def dbWeekday():
         return datetime.now().weekday()
          
     
@@ -73,9 +76,10 @@ class QueryService:
     def dbFormat(self):
         formatDB.formatDB(self.filename)
 
-    def grammaticalJoin(self, list):
+    @staticmethod
+    def grammaticalJoin(list):
         cleanedList = [i.strip() for i in list if i]
-        return ", ".join(cleanedList[:-2] + [" and ".join(cleanedList[-2:])])
+        return ", ".join(cleanedList[:-2] + [" & ".join(cleanedList[-2:])])
     
     def display(self):
         self.cursor.execute('''SELECT "day_id", "show_title", "dj_name", "start_time", "end_time" FROM shows''')
@@ -93,24 +97,23 @@ class QueryService:
         day = self.dbWeekday()
         start = self.dbTime()
 
-        valid_filter = 'AND "show_title" IS NOT NULL AND "show_title" != "" AND "show_title" != ?'
+        validFilter = 'AND "show_title" IS NOT NULL AND "show_title" != "" AND "show_title" != ?'
 
         # Query 1: Find the next valid slot
         self.cursor.execute(
             f"""
             SELECT day_id, start_time FROM shows 
             WHERE ((day_id > ?) OR (day_id = ? AND start_time > ?))
-            {valid_filter}
+            {validFilter}
             ORDER BY day_id, start_time LIMIT 1
             """,
             (day, day, start, self.automationShow)
         )
         slot = self.cursor.fetchone()
 
-        # Query 2: Wrap around if nothing left this week
         if slot is None:
             self.cursor.execute(
-                f'SELECT day_id, start_time FROM shows WHERE 1=1 {valid_filter} ORDER BY day_id, start_time LIMIT 1',
+                f'SELECT day_id, start_time FROM shows WHERE 1=1 {validFilter} ORDER BY day_id, start_time LIMIT 1',
                 (self.automationShow,)
             )
             slot = self.cursor.fetchone()
@@ -118,9 +121,8 @@ class QueryService:
         if slot is None:
             return self.getAutoplay()
 
-        # Query 3: Fetch the actual rows
         self.cursor.execute(
-            f'SELECT rowid, * FROM shows WHERE day_id = ? AND start_time = ? {valid_filter}',
+            f'SELECT rowid, * FROM shows WHERE day_id = ? AND start_time = ? {validFilter}',
             (slot["day_id"], slot["start_time"], self.automationShow)
         )
         rows = self.cursor.fetchall()
@@ -203,6 +205,7 @@ class QueryService:
         #skip if yes.
         seenIDs = set()
 
+        index = 1
         for item in data.get('items', []):
             track = item.get('track')
             if track.get('id') in seenIDs:
@@ -210,6 +213,7 @@ class QueryService:
             images = track.get('album', {}).get('images', [])
             releaseDate = track.get('album', {}).get('release_date', [])
             recentTracks.append({
+                "index": index,
                 "name": track.get('name'),
                 "artists": self.grammaticalJoin([song['name'] for song in track.get('artists', [])]),
                 "link": track.get('external_urls', {}).get('spotify'),
@@ -218,6 +222,7 @@ class QueryService:
                 "release_date": releaseDate.split("-")[0] if releaseDate else None,
                 "id": track.get('id')
             })
+            index+=1
             seenIDs.add(track.get('id'))
             if len(recentTracks) >= 10: break
         return recentTracks

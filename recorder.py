@@ -18,12 +18,14 @@ from dotenv import load_dotenv
 class Recorder:
 
     def __init__(self, db: QueryService):
-        #AWS variables
+        #The RowID of the current show to be recorded. If a RowID is different from current, time to record.
+        self.currentShowID = 0
         self.emailAddress = os.getenv("EMAIL_ADDRESS").strip()
         self.emailPassword = os.getenv("EMAIL_PASSWORD").strip()
         self.s3client = boto3.client('s3')
         self.streamURL = "https://kscu.streamguys1.com/live" 
         self.self.s3bucket = "kscu"
+        self.database = db
         recordingLock = threading.Lock()
 
     def isNowInShow(self, now_time, start_time, end_time):
@@ -85,16 +87,16 @@ class Recorder:
         
         contents = f"""Hi {dj_name},
 
-    Your show, "{show_title}", from {date_str} has been recorded!
+        Your show, "{show_title}", from {date_str} has been recorded!
 
-    You can download the recording here (the link will expire in 7 days):
-    {url}
+        You can download the recording here (the link will expire in 7 days):
+        {url}
 
-    If there are any issues with this email or the recording, please let us know by sending an email to gm@kscu.org!
+        If there are any issues with this email or the recording, please let us know by sending an email to gm@kscu.org!
 
-    Thanks for being part of the team!
-    Your friends at KSCU The Underground Sound
-    """
+        Thanks for being part of the team!
+        Your friends at KSCU The Underground Sound
+        """
         yag = yagmail.SMTP(self.emailAddress, self.emailPassword)
         try:
             result = yag.send(
@@ -173,7 +175,7 @@ class Recorder:
             if self.uploadToS3(filepath, filename):
                 print("upload succeeded")
                 if (dj_name != "KSCU Bot") and (dj_name != "Unknown DJ"):
-                    if (self.sendEmailWithAttachment(self.s3bucket, filename, dj_email, dj_name, show_title, now)):
+                    if (self.sendEmailWithAttachment(self.s3bucket, filename, dj_email, dj_name, show_title, now)):#dj_email
                         print(f"Email sent.")
                         os.remove(filepath)
                         print(f"Deleted local file {filepath}.")
@@ -244,3 +246,4 @@ class Recorder:
     except Exception as e:
         print(f"Scheduler error: {e}")
         time.sleep(60)
+    
