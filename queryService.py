@@ -212,12 +212,13 @@ class QueryService:
                 continue
             images = track.get('album', {}).get('images', [])
             releaseDate = track.get('album', {}).get('release_date', [])
+            timestampLocal = item.get('played_at')
             recentTracks.append({
                 "index": index,
                 "name": track.get('name'),
                 "artists": self.grammaticalJoin([song['name'] for song in track.get('artists', [])]),
                 "link": track.get('external_urls', {}).get('spotify'),
-                "played_at": item.get('played_at'),
+                "played_at": timestampLocal,
                 "image": images[0]['url'] if images else None,
                 "release_date": releaseDate.split("-")[0] if releaseDate else None,
                 "id": track.get('id')

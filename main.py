@@ -3,6 +3,7 @@ import httpx
 import formatDB 
 import urllib.parse
 import asyncio
+from contextlib import asynccontextmanager
 from datetime import datetime
 from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.responses import RedirectResponse
@@ -22,6 +23,7 @@ clientID = os.getenv("CLIENT_ID").strip()
 clientSecret = os.getenv("CLIENT_SECRET").strip()
 authURL = os.getenv("AUTH_URL").strip()
 redirectURI = os.getenv("REDIRECT_URI").strip()
+
 
 class GlobalState:
     activeToken = None
@@ -55,12 +57,12 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-@app.on_event("startup")
-def startSentinel():
-    asyncio.create_task(trackSentinel())
-    #asyncio.create_task(showSentinel())
+@asynccontextmanager
+def startWatchdog():
+    asyncio.create_task(trackWatchdog())
+    #asyncio.create_task(showWatchdog())
 
-async def trackSentinel():
+async def trackWatchdog():
     prevTrack = None
     curTrack = currentTrack()
     if curTrack != prevTrack:
@@ -69,7 +71,7 @@ async def trackSentinel():
             message = f"Now playing: {currentTrack['title']}"
         ))
         prevTrack = curTrack
-        await asyncio.sleep(5)
+        await asyncio.sleep(10)
 
 @app.get("/")
 def root(): return {
@@ -80,7 +82,7 @@ def root(): return {
     "/tracks/current": "current track playing",
     "/tracks/recent": "returns the 20 most recently played tracks",
     "/metrics": "used for Grafana monitoring",
-    "/upload-schedule (POST)": "used for sending a schedule database at the beginning of a new quarter, or to update an existing one",
+    "/upload-schedule (POST)": "used for sending a schedule database at the beginning of a new quarter, or to replace an existing one",
 }
 
 @app.get("/healthcheck")

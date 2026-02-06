@@ -1,5 +1,6 @@
 import asyncio
 from pydantic import BaseModel
+import httpx
 
 class EventModel(BaseModel):
     type: str
@@ -15,9 +16,9 @@ class SSEEventManager:
         return queue
     
     def unsubscribe(self, queue):
-        self.subscribers.remove(queue)
+        self.subscribers.discard(queue)
 
     async def emit(self, event: EventModel):
         if not self.subscribers: return
         for queue in self.subscribers:
-            await queue.put(event) 
+            await queue.httpx.put(event) 
