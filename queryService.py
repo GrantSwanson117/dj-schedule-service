@@ -4,7 +4,6 @@ import formatDB
 import os
 import httpx
 from datetime import datetime
-from fastapi import Request
 from fastapi.responses import RedirectResponse
 
 class QueryService:
@@ -17,6 +16,8 @@ class QueryService:
 
         self.automationDJ: str = os.getenv("AUTOMATION_DJ").strip()
         self.automationShow: str = os.getenv("AUTOMATION_SHOW").strip()
+
+        self.refreshToken = os.getenv("SPOTIFY_REFRESH_TOKEN").strip()
 
         self.clientID = os.getenv("CLIENT_ID").strip()
         self.clientSecret = os.getenv("CLIENT_SECRET").strip()
@@ -37,13 +38,24 @@ class QueryService:
     def dbWeekday():
         return datetime.now().weekday()
          
-    
+    async def getAccessToken(self):
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                self.tokenURL,
+                data={
+                    "grant_type": "refresh_token",
+                    "refresh_token": self.refreshToken,
+                    "client_id": self.clientID,
+                    "client_secret": self.clientSecret,
+                },
+            )
+            data = response.json()
+            return data.get("access_token")
+        
     def dbCurrentShow(self):
         weekday = self.dbWeekday()
         currentTime = self.dbTime()
-        
-        print(f"DEBUG: Weekday={weekday}, Time={currentTime}")
-        
+                
         self.cursor.execute(
             "SELECT rowid, * FROM shows WHERE day_id = ? AND start_time <= ? AND end_time > ?", 
             (weekday, currentTime, currentTime)
@@ -129,49 +141,16 @@ class QueryService:
 
         return self.handleCohosts(rows)
 
-    async def dbCallback(self, request: Request):
-        code = request.query_params.get('code')
-        error = request.query_params.get('error')
-
-        if error:
-            return {"error": error}
-        
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                self.tokenURL,
-                data={
-                    'grant_type': 'authorization_code',
-                    'code': code,
-                    'redirect_uri': self.redirectURI,
-                    'client_id': self.clientID,
-                    'client_secret': self.clientSecret,
-                }
-            )
-        
-        token_info = response.json()
-        request.session['access_token'] = token_info.get('access_token')
-        request.session['refresh_token'] = token_info.get('refresh_token')
-        request.session['expires_at'] = datetime.now().timestamp() + token_info.get('expires_in', 3600)
-        
-        return RedirectResponse(url="/tracks/current")
-    
-    async def dbCurrentTrack(self, request: Request):
-        access_token = request.session.get('access_token')
-        expires_at = request.session.get('expires_at')
-
-        if not access_token:
-            return RedirectResponse(url="/login")
-        
-        if expires_at and datetime.now().timestamp() > expires_at:
-            return RedirectResponse('/refresh-token')
+    async def dbCurrentTrack(self):
+        token = await self.getAccessToken()
         
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 f"{self.apiBaseURL}/me/player/currently-playing",
-                headers={"Authorization": f"Bearer {access_token}"}
+                headers={"Authorization": f"Bearer {token}"}
             )
 
-        if response.status_code == 204:
+        if response.status_code == 204 or response.status_code == 404:
             return {"message": "No track currently playing"}
         
         data = response.json()
@@ -188,8 +167,8 @@ class QueryService:
             "image": images[0]['url'] if images else None,
             "release_date": releaseDate.split("-")[0] if releaseDate else None,
         }
-    async def dbGetRecentTracks(self, request: Request):
-        token = request.session.get('access_token')
+    async def dbRecentTracks(self):
+        token = await self.getAccessToken()
         if not token:
             return RedirectResponse(url="/login")
 

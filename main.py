@@ -2,12 +2,12 @@ import os
 import httpx
 import formatDB 
 import urllib.parse
+import json
 import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime
 from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.responses import RedirectResponse
-from starlette.middleware.sessions import SessionMiddleware
 from sse_starlette.sse import EventSourceResponse
 from fastapi.middleware.cors import CORSMiddleware
 from queryService import QueryService
@@ -35,20 +35,24 @@ db = QueryService('schedule.db')
 db.dbFormat()
 eventManager = SSEEventManager()
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    trackTask = asyncio.create_task(trackWatchdog())
+    showTask = asyncio.create_task(showWatchdog())
+    yield
+    # At shutdown
+    trackTask.cancel()
+    showTask.cancel()
+
 #Show recorder instantiation
 #rc = Recorder(db)
 
-app = FastAPI()
+app = FastAPI(lifespan = lifespan)
 
 origins = [
     "http://localhost:8000",
     "http://127.0.0.1:8000"
 ]
-
-app.add_middleware(
-    SessionMiddleware, 
-    secret_key=os.getenv("SPOTIFY_SECRET_KEY")
-)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -57,20 +61,47 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-@asynccontextmanager
-def startWatchdog():
-    asyncio.create_task(trackWatchdog())
-    #asyncio.create_task(showWatchdog())
-
 async def trackWatchdog():
-    prevTrack = None
-    curTrack = currentTrack()
-    if curTrack != prevTrack:
-        await eventManager.emit(EventModel(
-            type = "trackUpdate",
-            message = f"Now playing: {currentTrack['title']}"
-        ))
-        prevTrack = curTrack
+    prevtrackID = None
+    while True:
+        try:
+            track = await db.dbCurrentTrack()
+            
+            if track and "id" in track:
+                currTrackID = track["id"]
+                if currTrackID != prevtrackID:
+                    await eventManager.emit(EventModel(
+                        type=json.dumps("trackUpdate"),
+                        message=json.dumps(f"{track['name']} - {track['artists']}")
+                    ))
+                    prevtrackID = currTrackID
+                    print(f"""New Track: '{track['name']}' - {track['artists']}""")
+            
+        except Exception as e:
+            print(f"Watchdog Error: {e}")
+        await asyncio.sleep(10)
+
+async def showWatchdog():
+    prevShow = None
+    while True:
+        try:
+            show = db.dbCurrentShow()
+            if show:
+                currShow = show["show_title"]
+                if currShow != prevShow:
+                    await eventManager.emit(EventModel(
+                        type=json.dumps("trackUpdate"),
+                        message=json.dumps(f"{show['show_title']} - {show['dj_name']}")
+                    ))
+                    prevShow = currShow
+                    print(f"""New Show: '{show['show_title']}' - {show['dj_name']}""")
+
+                    ###########################
+                    #Start show recording here#
+                    ###########################
+                    
+        except Exception as e:
+            print(f"Watchdog Error: {e}")
         await asyncio.sleep(10)
 
 @app.get("/")
@@ -88,64 +119,38 @@ def root(): return {
 @app.get("/healthcheck")
 def healthCheck(): return {"Status:": "OK"}
 
-@app.get("/login")
-async def login():
-    scopes = [
-    "user-read-currently-playing",
-    "user-read-recently-played"
-]
-    params = {
-        'client_id': clientID,
-        'response_type': 'code',
-        'scope': " ".join(scopes),
-        'redirect_uri': redirectURI,
-        'show_dialog': 'false'
-    }
-    auth_link = f"{authURL}?{urllib.parse.urlencode(params)}"
-    return RedirectResponse(auth_link)  
+@app.get("/metrics")
+def metrics():
+    return {"message": "balls"}
 
-@app.get("/refresh-token")
-async def refreshToken(request: Request):
-    refresh_token = request.session.get('refresh_token')
-        
-    if not refresh_token:
-        return RedirectResponse('/login')
-        
+@app.get("/tracks/current/")
+async def currentTrack():
+    return await db.dbCurrentTrack()
+
+#Returns 20 most recent tracks
+@app.get("/tracks/recent/")
+async def recentTracks():
+    return await db.dbRecentTracks()
+
+@app.get("/shows/current/")
+async def currentShow():
+    return db.dbCurrentShow()
+
+@app.get("/get-token")
+async def get_my_token(code: str):
     async with httpx.AsyncClient() as client:
         response = await client.post(
             tokenURL,
             data={
-                'grant_type': 'refresh_token',
-                'refresh_token': refresh_token,
+                'grant_type': 'authorization_code',
+                'code': code,
+                'redirect_uri': redirectURI,
                 'client_id': clientID,
-                'client_secret': clientSecret
+                'client_secret': clientSecret,
             }
         )
-        
-    new_token_info = response.json()
+        return response.json()
     
-    request.session['access_token'] = new_token_info.get('access_token')
-    request.session['expires_at'] = datetime.now().timestamp() + new_token_info.get('expires_in', 3600)
-
-    return RedirectResponse("/tracks/current")
-
-@app.get("/callback")
-async def callback(request: Request):
-    return await db.dbCallback(request)
-
-@app.get("/tracks/current/")
-async def currentTrack(request: Request):
-    return await db.dbCurrentTrack(request)
-
-#Returns 20 most recent tracks
-@app.get("/tracks/recent/")
-async def get_recent_tracks(request: Request):
-    return await db.dbGetRecentTracks(request)
-
-@app.get("/shows/current/")
-def getCurrentShow():
-    return db.dbCurrentShow()
-
 @app.get("/shows/next/")
 def getNextShow():
     return db.dbNextShow()    
@@ -158,14 +163,15 @@ async def streamEvents(request: Request):
         try:
             while True:
                 # Check if client is still there
-                if await request.is_disconnected():
-                    break
+                if await request.is_disconnected(): break
                 
                 event = await queue.get()
                 yield {
                     "event": event.type,
                     "data": event.message
                 }
+        except asyncio.TimeoutError:
+            yield ": Empty Request"
         finally:
             eventManager.unsubscribe(queue)
 

@@ -203,7 +203,7 @@ class Recorder:
     def recordShowThreaded(self):
         threading.Thread(target=self.recordShowSafe).start()
 
-    def cleanupOldTempFiles():
+    def cleanupOldTempFiles(self):
         #cleans old files on startup
         try:
             temp_files = [f for f in os.listdir('/tmp') if f.endswith('.mp3')]
