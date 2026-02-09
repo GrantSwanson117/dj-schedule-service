@@ -1,0 +1,9 @@
+[Unit]
+Description=A show recorder process for the KSCU web server.
+After=network.target
+
+[Service]
+ExecStart=/home/ubuntu/kscu-web-server/recorder.py
+Restart=always
+user=ubuntu
+group=ubuntu

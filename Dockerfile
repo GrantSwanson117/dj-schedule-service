@@ -1,11 +1,16 @@
-FROM python:3.14-slim
+FROM python:3.11-slim
 
-# Install uv.
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+RUN apt-get update && \
+    apt-get install -y ffmpeg && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
-WORKDIR /
-RUN uv sync --frozen --no-cache
 
-# Run the FastAPI app.
-CMD ["/app/.venv/bin/fastapi", "run", "app/main.py", "--port", "80", "--host", "0.0.0.0"]
+EXPOSE 8000
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

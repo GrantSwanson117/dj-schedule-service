@@ -14,7 +14,7 @@ from queryService import QueryService
 from eventManager import SSEEventManager, EventModel
 from dotenv import load_dotenv
 
-#from recorder import Recorder
+from recording import Recorder
 
 load_dotenv()
 
@@ -39,13 +39,14 @@ eventManager = SSEEventManager()
 async def lifespan(app: FastAPI):
     trackTask = asyncio.create_task(trackWatchdog())
     showTask = asyncio.create_task(showWatchdog())
+    recorderTask = asyncio.create_task(asyncio.to_thread(rc.run))
     yield
     # At shutdown
     trackTask.cancel()
     showTask.cancel()
 
 #Show recorder instantiation
-#rc = Recorder(db)
+rc = Recorder(db)
 
 app = FastAPI(lifespan = lifespan)
 
