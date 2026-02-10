@@ -45,18 +45,18 @@ class ShowRecorder:
         return list(show_data.get('name'))  if show_data else []
 
     @staticmethod
-    def getShowName(show_data): 
+    def getShowName(show_data) -> str: 
         return show_data.get('show_title') if show_data else ""
     
     @staticmethod
-    def getDJ(show_data): 
+    def getDJ(show_data) -> str: 
         return show_data.get('dj_name') if show_data else []
     
     @staticmethod
     def getEmail(show_data) -> list: 
         #Test case: return["yourpersonalemail@xyz.com"]. 
         #I f the current show is a cohosted show, it would be return["yourpersonalemail@xyz.com", "yourpersonalemail@xyz.com"]
-        return ["grantswanson62@gmail.com", "grantswanson62@gmail.com"]
+        return ["grantswanson62@gmail.com"]
         #return list(show_data.get('email'))
     
     def upload_to_s3(self, filepath, filename):
@@ -75,39 +75,40 @@ class ShowRecorder:
         fileobj.seek(0)
         return fileobj
 
-    def send_email_with_attachment(self, bucket_name, filename, dj_emails, dj_names, show_title, date_str):
-        if len(dj_emails) != len(dj_names):
+    def send_email_with_attachment(self, bucket_name, filename, dj_emails, names, show_title, date_str):
+        if len(dj_emails) != len(names):
             print("DJ name and email mismatch. Please check database and reupload.")
-            return
-        
-        for i in dj_names:
-            url = self.s3_client.generate_presigned_url(
-                ClientMethod='get_object',
-                Params={'Bucket': bucket_name, 'Key': filename},
-                ExpiresIn=60 * 60 * 24 * 7 
-            )
+            return False
             
-            contents = f"""Hi {dj_names[i]},
+        url = self.s3_client.generate_presigned_url(
+            ClientMethod='get_object',
+            Params={'Bucket': bucket_name, 'Key': filename},
+            ExpiresIn=60 * 60 * 24 * 7
+        )
+        
+        yag = yagmail.SMTP(self.EMAIL_ADDRESS, self.EMAIL_PASSWORD)
+        success = True
 
-    Your show, "{show_title}", from {date_str} has been recorded!
+        for i, name in enumerate(names):
+            contents = f"""Hi {name},
 
-    You can download the recording here (the link will expire in 7 days):
-    {url}
+Your show, "{show_title}", from {date_str} has been recorded!
 
-    If there are any issues with this email or the recording, please let us know by sending an email to gm@kscu.org!
+You can download the recording here (the link will expire in 7 days):
+{url}
 
-    Thanks for being part of the team!
-    Your friends at KSCU The Underground Sound
-    """
-            yag = yagmail.SMTP(self.EMAIL_ADDRESS, self.EMAIL_PASSWORD)
+If there are any issues with this email or the recording, please let us know by sending an email to gm@kscu.org!
+
+Thanks for being part of the team!
+Your friends at KSCU The Underground Sound"""
             try:
                 yag.send(to=dj_emails[i], subject=f"Your KSCU Show Recording - {date_str}", contents=contents)
-                print(f"Email sent to{dj_emails[i]}.")
-                return True
+                print(f"Email sent to {dj_emails[i]}.")
             except Exception as e:
-                print(f"Error sending email: {e}")
-                return False
-        
+                print(f"Error sending email to {dj_emails[i]}: {e}")
+                success = False
+            
+        return success
     def cleanup_temp_file(self, filepath):
         try:
             if os.path.exists(filepath):
@@ -120,12 +121,12 @@ class ShowRecorder:
         local_tz = ZoneInfo("America/Los_Angeles")
         recording_start_time = datetime.now(local_tz)
 
-        dj_names = self.getDJ(show_data)
+        names = self.getName(show_data)
         show_title = self.getShowName(show_data)
         dj_emails = self.getEmail(show_data)
         
         print(f"Recording started at: {recording_start_time.strftime('%H:%M:%S')}")
-        print(f"DJ Info - Name: {dj_names}, Show: {show_title}")
+        print(f"DJ Info - Name: {names}, Show: {show_title}")
 
         now = recording_start_time.strftime("%m-%d-%Y")
         hour = recording_start_time.strftime("%H")
@@ -154,14 +155,12 @@ class ShowRecorder:
             print(f"Error during recording: {e}")
             return
 
-        # Upload and email logic (Runs AFTER the process is killed)
         try:
             if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
                 if self.upload_to_s3(filepath, filename):
-                    # Use your logic to check if it's a real DJ before emailing
-                    check_name = dj_names[0] if isinstance(dj_names, list) else dj_names
+                    check_name = names[0] if isinstance(names, list) else names
                     if check_name not in ["KSCU Bot", "Unknown DJ"]:
-                        self.send_email_with_attachment(self.S3_BUCKET, filename, dj_emails, dj_names, show_title, now)
+                        self.send_email_with_attachment(self.S3_BUCKET, filename, dj_emails, names, show_title, now)
                     os.remove(filepath)
             else:
                 print(f"File {filepath} was empty or not found. Skipping upload.")
@@ -171,7 +170,7 @@ class ShowRecorder:
             self.cleanup_temp_file(filepath)
         
     def record_show_safe(self, show_data):
-        if not self.recording_lock.acquire(blocking=False):
+        if not self.recording_lock.acquire():
             print("Recording in progress, skipping this check")
             return
         try:
@@ -210,11 +209,10 @@ class ShowRecorder:
                     #Buffer to let other threads finish
                     time.sleep(3)
 
-                dj_name_check = show.get('dj_name')
-                first_dj = dj_name_check[0] if isinstance(dj_name_check, list) else dj_name_check
+                dj = show.get('dj_name')
                 
-                if first_dj != self.database.automationDJ:
-                    print(f"New show detected: {show['show_title']} ({first_dj})")
+                if dj != self.database.automationDJ:
+                    print(f"New show detected: {show['show_title']} - {dj}")
                     self.record_show_threaded(show)
                     self.last_recorded_show = show_id
                 else:

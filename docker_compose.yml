@@ -1,0 +1,13 @@
+services:
+  kscu-recorder:
+    build: .
+    container_name: kscu-web-server
+    restart: always
+    volumes:
+      - ./temp_recordings:/tmp
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
