@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 RUN apt-get update && \
     apt-get install -y ffmpeg && \
@@ -7,7 +7,8 @@ RUN apt-get update && \
 WORKDIR /app
 
 COPY pyproject.toml .
-RUN pip install --no-cache-dir -r pyproject.toml
+
+RUN pip install .
 
 COPY . .
 
