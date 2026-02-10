@@ -6,38 +6,58 @@ import subprocess
 import yagmail
 import boto3
 import threading
+import json
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from queryService import QueryService
 
-class Recorder:
+class ShowRecorder:
     def __init__(self, db: QueryService):
         print("Recording service active.")
         self.database = db
-        self.EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
-        self.EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+        self.EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS").strip()
+        self.EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD").strip()
         self.STREAM_URL = "https://kscu.streamguys1.com/live" 
+
         
         # AWS 
         self.S3_BUCKET = "kscu"
-        self.s3_client = boto3.client('s3')
+        aws_access = os.getenv("AWS_ACCESS_KEY_ID").strip()
+        aws_secret = os.getenv("AWS_SECRET_ACCESS_KEY").strip()
+        self.s3_client = boto3.client(
+            's3',
+            aws_access_key_id=aws_access,
+            aws_secret_access_key=aws_secret,
+            region_name="us-west-1"
+        )
 
         self.last_recorded_show = None
         self.recording_lock = threading.Lock()
 
         self.cleanup_old_temp_files()
 
-    def getDJ(self, show_data): 
-        #Returns a list of names
-        return show_data.get('dj_name')
-        
-    def getShowName(self, show_data): 
-        return show_data.get('show_title')
+    @staticmethod
+    def recorderHealthCheck():
+        return{"Status:": "OK"}
+
+    @staticmethod
+    def getName(show_data) -> list: 
+        return list(show_data.get('name'))  if show_data else []
+
+    @staticmethod
+    def getShowName(show_data): 
+        return show_data.get('show_title') if show_data else ""
     
-    def getEmail(self, show_data): 
-        #Returns a list of emails
-        return "grantswanson62@gmail.com"
-        #return show_data.get('email')
+    @staticmethod
+    def getDJ(show_data): 
+        return show_data.get('dj_name') if show_data else []
+    
+    @staticmethod
+    def getEmail(show_data) -> list: 
+        #Test case: return["yourpersonalemail@xyz.com"]. 
+        #I f the current show is a cohosted show, it would be return["yourpersonalemail@xyz.com", "yourpersonalemail@xyz.com"]
+        return ["grantswanson62@gmail.com", "grantswanson62@gmail.com"]
+        #return list(show_data.get('email'))
     
     def upload_to_s3(self, filepath, filename):
         print(f"Uploading {filename} to S3")
@@ -100,54 +120,53 @@ class Recorder:
         local_tz = ZoneInfo("America/Los_Angeles")
         recording_start_time = datetime.now(local_tz)
 
-        dj_name = self.getDJ(show_data)
+        dj_names = self.getDJ(show_data)
         show_title = self.getShowName(show_data)
-        dj_email = self.getEmail(show_data)
-        
-        duration_minutes = show_data['end_time'] - show_data['start_time']
-        duration_seconds = duration_minutes * 60
-        duration_seconds = max(0, duration_seconds - 15)
+        dj_emails = self.getEmail(show_data)
         
         print(f"Recording started at: {recording_start_time.strftime('%H:%M:%S')}")
-        print(f"DJ Info - Name: {dj_name}, Show: {show_title}, Email: {dj_email}")
+        print(f"DJ Info - Name: {dj_names}, Show: {show_title}")
 
         now = recording_start_time.strftime("%m-%d-%Y")
         hour = recording_start_time.strftime("%H")
         
-        filename = f"{show_title.replace(' ', '_')}_{now}_{hour}00.mp3"
+        safe_title = "".join([c if c.isalnum() else "_" for c in show_title])
+        filename = f"{safe_title}_{now}_{hour}00.mp3"
         filepath = f"/tmp/{filename}"
 
         if 1 <= recording_start_time.hour < 7:
             print("Skipping recording: between 1am and 7am.")
             return
 
-        print(f"Starting recording for {dj_name}...")
-
         try:
-            subprocess.run([
+            self.current_process = subprocess.Popen([
                 "ffmpeg", "-y", "-i", self.STREAM_URL,
-                "-t", str(duration_seconds),
                 "-acodec", "libmp3lame",
                 filepath
-            ], timeout=duration_seconds + 30, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 
-            if not os.path.exists(filepath):
-                print(f"didn't create file: {filepath}")
-                return
-        except subprocess.TimeoutExpired:
-            print(f"Finished recording: {filepath}")
+            print(f"FFmpeg started.")
+            
+            self.current_process.wait()
+            print(f"FFmpeg process finished for {show_title}.")
+
         except Exception as e:
             print(f"Error during recording: {e}")
             return
 
-        #Upload and email logic
+        # Upload and email logic (Runs AFTER the process is killed)
         try:
-            if self.upload_to_s3(filepath, filename):
-                if (dj_name != "KSCU Bot") and (dj_name != "Unknown DJ") and dj_email:
-                    self.send_email_with_attachment(self.S3_BUCKET, filename, dj_email, dj_name, show_title, now)
+            if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
+                if self.upload_to_s3(filepath, filename):
+                    # Use your logic to check if it's a real DJ before emailing
+                    check_name = dj_names[0] if isinstance(dj_names, list) else dj_names
+                    if check_name not in ["KSCU Bot", "Unknown DJ"]:
+                        self.send_email_with_attachment(self.S3_BUCKET, filename, dj_emails, dj_names, show_title, now)
                     os.remove(filepath)
             else:
-                print(f"Upload failed.")
+                print(f"File {filepath} was empty or not found. Skipping upload.")
+        except Exception as e:
+            print(f"Failed post-recording steps: {e}")
         finally:
             self.cleanup_temp_file(filepath)
         
@@ -174,19 +193,39 @@ class Recorder:
             print(f"error cleaning old files: {e}")
 
     def check_and_record(self):
-        show = self.database.dbCurrentShow()
-        if not show or show.get('dj_name') == self.database.automationDJ:
-            return
+        try:
+            show = self.database.dbCurrentShow()
+            if not show:
+                return
 
-        #Create unique ID for current date and timeslot
-        show_id = f"{show['rowid']}_{datetime.now().strftime('%Y-%m-%d')}"
+            #Building unique ID for show
+            show_id = f"{show['rowid']}_{datetime.now().strftime('%Y-%m-%d')}"
 
-        if self.last_recorded_show != show_id:
-            self.record_show_threaded(show)
-            self.last_recorded_show = show_id
+            if self.last_recorded_show != show_id:
+                
+                if hasattr(self, 'current_process') and self.current_process.poll() is None:
+                    print(f"Ending current recording to start new show or automation.")
+                    self.current_process.terminate()
+                    
+                    #Buffer to let other threads finish
+                    time.sleep(3)
+
+                dj_name_check = show.get('dj_name')
+                first_dj = dj_name_check[0] if isinstance(dj_name_check, list) else dj_name_check
+                
+                if first_dj != self.database.automationDJ:
+                    print(f"New show detected: {show['show_title']} ({first_dj})")
+                    self.record_show_threaded(show)
+                    self.last_recorded_show = show_id
+                else:
+                    print("Automated show.")
+                    self.last_recorded_show = show_id
+
+        except Exception as e:
+            print(f"Check error: {e}")
 
     def run(self):
-        schedule.every(10).seconds.do(self.check_and_record)
+        schedule.every(60).seconds.do(self.check_and_record)
         while True:
             schedule.run_pending()
             time.sleep(1)

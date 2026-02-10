@@ -14,7 +14,7 @@ from queryService import QueryService
 from eventManager import SSEEventManager, EventModel
 from dotenv import load_dotenv
 
-from recording import Recorder
+from showRecorder import ShowRecorder
 
 load_dotenv()
 
@@ -46,7 +46,7 @@ async def lifespan(app: FastAPI):
     showTask.cancel()
 
 #Show recorder instantiation
-rc = Recorder(db)
+rc = ShowRecorder(db)
 
 app = FastAPI(lifespan = lifespan)
 
@@ -117,12 +117,15 @@ def root(): return {
     "/upload-schedule (POST)": "used for sending a schedule database at the beginning of a new quarter, or to replace an existing one",
 }
 
-@app.get("/healthcheck")
+@app.get("/server-healthcheck")
 def healthCheck(): return {"Status:": "OK"}
+
+@app.get("/recorder-healthcheck")
+def healthCheck(): return rc.recorderHealthCheck()
 
 @app.get("/metrics")
 def metrics():
-    return {"message": "balls"}
+    return {"Message": "placeholder metrics"}
 
 @app.get("/tracks/current/")
 async def currentTrack():
