@@ -91,16 +91,16 @@ class ShowRecorder:
 
         for i, name in enumerate(names):
             contents = dedent(f"""\
-                            Hi {name},
+                Hi {name},
 
-                            Your show, "{show_title}", from {date_str} has been recorded!
+                Your show, "{show_title}", from {date_str} has been recorded!
 
-                            You can download the recording here (the link will expire in 7 days):
-                            {url}
+                You can download the recording here (the link will expire in 7 days):
+                {url}
 
-                            If there are any issues with this email or the recording, please let us know by sending an email to gm@kscu.org!
+                If there are any issues, email gm@kscu.org!
 
-                            Your friends at KSCU, The Underground Sound""").strip()
+                Your friends at KSCU The Underground Sound""").strip()
             try:
                 yag.send(to=dj_emails[i], subject=f"Your KSCU Show Recording - {date_str}", contents=contents)
                 print(f"Email sent to {dj_emails[i]}.")
