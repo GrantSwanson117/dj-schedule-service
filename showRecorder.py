@@ -6,7 +6,7 @@ import subprocess
 import yagmail
 import boto3
 import threading
-import json
+from textwrap import dedent
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from queryService import QueryService
@@ -90,17 +90,17 @@ class ShowRecorder:
         success = True
 
         for i, name in enumerate(names):
-            contents = f"""Hi {name},
+            contents = dedent(f"""\
+                            Hi {name},
 
-Your show, "{show_title}", from {date_str} has been recorded!
+                            Your show, "{show_title}", from {date_str} has been recorded!
 
-You can download the recording here (the link will expire in 7 days):
-{url}
+                            You can download the recording here (the link will expire in 7 days):
+                            {url}
 
-If there are any issues with this email or the recording, please let us know by sending an email to gm@kscu.org!
+                            If there are any issues with this email or the recording, please let us know by sending an email to gm@kscu.org!
 
-Thanks for being part of the team!
-Your friends at KSCU The Underground Sound"""
+                            Your friends at KSCU, The Underground Sound""").strip()
             try:
                 yag.send(to=dj_emails[i], subject=f"Your KSCU Show Recording - {date_str}", contents=contents)
                 print(f"Email sent to {dj_emails[i]}.")
@@ -108,7 +108,7 @@ Your friends at KSCU The Underground Sound"""
                 print(f"Error sending email to {dj_emails[i]}: {e}")
                 success = False
             
-        return success
+            return success
     def cleanup_temp_file(self, filepath):
         try:
             if os.path.exists(filepath):
@@ -198,7 +198,8 @@ Your friends at KSCU The Underground Sound"""
                 return
 
             #Building unique ID for show
-            show_id = f"{show['rowid']}_{datetime.now().strftime('%Y-%m-%d')}"
+            rowid = show.get('rowid', 'unknown')
+            show_id = f"{rowid}_{datetime.now().strftime('%Y-%m-%d')}"
 
             if self.last_recorded_show != show_id:
                 
