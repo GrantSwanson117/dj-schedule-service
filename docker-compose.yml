@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  kscu-web-server:
+    build: .
+    container_name: kscu-web-server
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - TZ=America/Los_Angeles
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+      - ./my_database.db:/app/my_database.db
+      - ./temp_recordings:/tmp
+    env_file:
+      - .env

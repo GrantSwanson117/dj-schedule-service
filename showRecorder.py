@@ -56,8 +56,7 @@ class ShowRecorder:
     def getEmail(show_data) -> list: 
         #Test case: return["yourpersonalemail@xyz.com"]. 
         #I f the current show is a cohosted show, it would be return["yourpersonalemail@xyz.com", "yourpersonalemail@xyz.com"]
-        return ["grantswanson62@gmail.com"]
-        #return list(show_data.get('email'))
+        return list(show_data.get('email'))
     
     def upload_to_s3(self, filepath, filename):
         print(f"Uploading {filename} to S3")

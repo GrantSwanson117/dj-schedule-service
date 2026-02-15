@@ -91,7 +91,7 @@ async def showWatchdog():
                 currShow = show["show_title"]
                 if currShow != prevShow:
                     await eventManager.emit(EventModel(
-                        type=json.dumps("trackUpdate"),
+                        type=json.dumps("showUpdate"),
                         message=json.dumps(f"{show['show_title']} - {show['dj_name']}")
                     ))
                     prevShow = currShow
