@@ -184,7 +184,7 @@ class QueryService:
         #skip if yes.
         seenIDs = set()
 
-        index = 1
+        index = 0
         for item in data.get('items', []):
             track = item.get('track')
             if track.get('id') in seenIDs:
@@ -202,7 +202,9 @@ class QueryService:
                 "release_date": releaseDate.split("-")[0] if releaseDate else None,
                 "id": track.get('id')
             })
+            recentTracks[index]["label"] = f"track-{index}"
             index+=1
             seenIDs.add(track.get('id'))
             if len(recentTracks) >= 10: break
+            
         return recentTracks

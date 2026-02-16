@@ -178,7 +178,7 @@ async def streamEvents(request: Request):
         except asyncio.TimeoutError:
             yield ": Empty Request"
         finally:
-            eventManager.unsubscribe(queue)
+            await eventManager.unsubscribe(queue)
 
     return EventSourceResponse(streamGenerator())
 
