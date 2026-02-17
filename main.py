@@ -1,7 +1,5 @@
 import os
 import httpx
-import formatDB 
-import urllib.parse
 import json
 import asyncio
 from contextlib import asynccontextmanager
@@ -97,10 +95,6 @@ async def showWatchdog():
                     ))
                     prevShow = currShow
                     print(f"""New Show: '{show['show_title']}' - {show['dj_name']}""")
-
-                    ###########################
-                    #Start show recording here#
-                    ###########################
                     
         except Exception as e:
             print(f"Watchdog Error: {e}")
@@ -114,8 +108,6 @@ def root(): return {
     "/shows/next": "next show scheduled to play (ignoring automated shows)",
     "/tracks/current": "current track playing",
     "/tracks/recent": "returns the 20 most recently played tracks",
-    "/metrics": "used for Grafana monitoring",
-    "/upload-schedule (POST)": "used for sending a schedule database at the beginning of a new quarter, or to replace an existing one",
 }
 
 @app.get("/server-healthcheck")
@@ -128,16 +120,16 @@ def healthCheck(): return rc.recorderHealthCheck()
 def metrics():
     return {"Message": "placeholder metrics"}
 
-@app.get("/tracks/current/")
+@app.get("/tracks/current")
 async def currentTrack():
     return await db.dbCurrentTrack()
 
 #Returns 20 most recent tracks
-@app.get("/tracks/recent/")
+@app.get("/tracks/recent")
 async def recentTracks():
     return await db.dbRecentTracks()
 
-@app.get("/shows/current/")
+@app.get("/shows/current")
 async def currentShow():
     return db.dbCurrentShow()
 
@@ -186,8 +178,3 @@ async def streamEvents(request: Request):
 async def newEvent(event: EventModel):
     await eventManager.emit(event)
     return {"message": f"Event '{event.type}' sent to {len(eventManager.subscribers)} listeners"}
-
-@app.post("/upload-schedule/")
-def uploadSchedule(file, background_tasks: BackgroundTasks):
-    background_tasks.add_task(formatDB, file.filename)
-    return {"status": "Schedule received; Processing."}

@@ -1,6 +1,5 @@
 import asyncio
 from pydantic import BaseModel
-import httpx
 import json
 
 class EventModel(BaseModel):
