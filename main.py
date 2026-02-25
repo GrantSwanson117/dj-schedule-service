@@ -149,7 +149,7 @@ async def get_my_token(code: str):
         )
         return response.json()
     
-@app.get("/shows/next/")
+@app.get("/shows/next")
 def getNextShow():
     return db.dbNextShow()    
 
