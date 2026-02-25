@@ -55,9 +55,8 @@ class ShowRecorder:
     @staticmethod
     def getEmail(show_data) -> list: 
         #Test case: return["yourpersonalemail@xyz.com"]. 
-        #I f the current show is a cohosted show, it would be return["yourpersonalemail@xyz.com", "yourpersonalemail@xyz.com"]
+        #If the current show is a cohosted show, it would be return["yourpersonalemail@xyz.com", "yourpersonalemail@xyz.com"]
         return list(show_data.get('email'))
-        #return ["grantswanson62@gmail.com"]
     
     def upload_to_s3(self, filepath, filename):
         print(f"Uploading {filename} to S3")
