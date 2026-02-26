@@ -126,6 +126,11 @@ def healthCheck(): return {"Server Status:": "OK", "Recorder Status": rc.recorde
 async def currentTrack():
     return await db.dbCurrentTrack()
 
+#Legacy URL
+@app.get("/spins/get")
+async def currentTrack():
+    return await db.dbCurrentTrack()
+
 #Returns 20 most recent tracks
 @app.get("/tracks/recent")
 async def recentTracks():
