@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
 #Show recorder instantiation
 rc = ShowRecorder(db)
 
-app = FastAPI(lifespan = lifespan)
+app = FastAPI(lifespan = lifespan, redirect_slashes= False)
 
 origins = [
     "http://localhost:8000",
@@ -103,7 +103,7 @@ async def showWatchdog():
 @app.middleware("http")
 async def silence_legacy_spins(request: Request, call_next):
     if request.url.path == "/spins/get" or "/spins/update":
-        return RedirectResponse(url="/tracks/current/", status_code=307)
+        return RedirectResponse(url="/tracks/current", status_code=307)
     
     response = await call_next(request)
     return response
