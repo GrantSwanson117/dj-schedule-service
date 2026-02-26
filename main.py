@@ -3,8 +3,9 @@ import httpx
 import json
 import asyncio
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, BackgroundTasks
+from fastapi import FastAPI, Request
 from sse_starlette.sse import EventSourceResponse
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from queryService import QueryService
 from eventManager import SSEEventManager, EventModel
@@ -98,6 +99,14 @@ async def showWatchdog():
         except Exception as e:
             print(f"Watchdog Error: {e}")
         await asyncio.sleep(10)
+
+@app.middleware("http")
+async def silence_legacy_spins(request: Request, call_next):
+    if request.url.path == "/spins/get" or "/spins/update":
+        return RedirectResponse(url="/tracks/current/", status_code=307)
+    
+    response = await call_next(request)
+    return response
 
 @app.get("/")
 def root(): return {
