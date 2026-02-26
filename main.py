@@ -3,9 +3,7 @@ import httpx
 import json
 import asyncio
 from contextlib import asynccontextmanager
-from datetime import datetime
 from fastapi import FastAPI, Request, BackgroundTasks
-from fastapi.responses import RedirectResponse
 from sse_starlette.sse import EventSourceResponse
 from fastapi.middleware.cors import CORSMiddleware
 from queryService import QueryService
@@ -56,7 +54,7 @@ origins = [
 ]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
@@ -106,20 +104,14 @@ def root(): return {
     "Hello!": "welcome to the KSCU web server! the following endpoints are used for data fetching and monitoring.",
     "/": "root, for help and info",
     "/shows/current": "show currently playing",
+    "/stream": "real-time SSE stream for new shows and tracks",
     "/shows/next": "next show scheduled to play (ignoring automated shows)",
     "/tracks/current": "current track playing",
     "/tracks/recent": "returns the 20 most recently played tracks",
 }
 
-@app.get("/server-healthcheck")
-def healthCheck(): return {"Status:": "OK"}
-
-@app.get("/recorder-healthcheck")
-def healthCheck(): return rc.recorderHealthCheck()
-
-@app.get("/metrics")
-def metrics():
-    return {"Message": "placeholder metrics"}
+@app.get("/healthcheck")
+def healthCheck(): return {"Server Status:": "OK", "Recorder Status": rc.recorderHealthCheck}
 
 @app.get("/tracks/current")
 async def currentTrack():

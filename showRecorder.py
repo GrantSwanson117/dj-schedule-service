@@ -38,7 +38,7 @@ class ShowRecorder:
 
     @staticmethod
     def recorderHealthCheck():
-        return{"Status:": "OK"}
+        return{"OK"}
 
     @staticmethod
     def getName(show_data) -> list: 
