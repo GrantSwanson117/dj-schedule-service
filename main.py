@@ -100,13 +100,13 @@ async def showWatchdog():
             print(f"Watchdog Error: {e}")
         await asyncio.sleep(10)
 
-@app.middleware("http")
+'''@app.middleware("http")
 async def silence_legacy_spins(request: Request, call_next):
     if request.url.path == "/spins/get" or "/spins/update":
         return RedirectResponse(url="/tracks/current", status_code=307)
     
     response = await call_next(request)
-    return response
+    return response'''
 
 @app.get("/")
 def root(): return {
