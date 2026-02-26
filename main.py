@@ -1,11 +1,7 @@
-import os
-import httpx
-import json
-import asyncio
+import os, httpx, json, asyncio, logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from sse_starlette.sse import EventSourceResponse
-from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from queryService import QueryService
 from eventManager import SSEEventManager, EventModel
@@ -61,6 +57,16 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+class QuietLogger(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        # If the log contains these noisy paths, don't show it
+        msg = record.getMessage()
+        return "/tracks/current" not in msg and "/spins/get" not in msg
+
+# 2. Apply it to the uvicorn access logger
+logger = logging.getLogger("uvicorn.access")
+logger.addFilter(QuietLogger())
+
 async def trackWatchdog():
     prevtrackID = None
     while True:
@@ -99,14 +105,6 @@ async def showWatchdog():
         except Exception as e:
             print(f"Watchdog Error: {e}")
         await asyncio.sleep(10)
-
-'''@app.middleware("http")
-async def silence_legacy_spins(request: Request, call_next):
-    if request.url.path == "/spins/get" or "/spins/update":
-        return RedirectResponse(url="/tracks/current", status_code=307)
-    
-    response = await call_next(request)
-    return response'''
 
 @app.get("/")
 def root(): return {
