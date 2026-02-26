@@ -37,18 +37,13 @@ async def lifespan(app: FastAPI):
     # At shutdown
     trackTask.cancel()
     showTask.cancel()
+    recorderTask.cancel()
 
 #Show recorder instantiation
 rc = ShowRecorder(db)
 
 app = FastAPI(lifespan = lifespan, redirect_slashes= False)
 
-origins = [
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-    "http://localhost:1313",
-    "https://kscu.org/"
-]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -59,9 +54,9 @@ app.add_middleware(
 
 class QuietLogger(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
-        # If the log contains these noisy paths, don't show it
+        #Old stubborn URLs. Deprecated.
         msg = record.getMessage()
-        return "/tracks/current" not in msg and "/spins/get" not in msg
+        return "/spins/get" not in msg and "shows/get" not in msg and "/shows/update"
 
 # 2. Apply it to the uvicorn access logger
 logger = logging.getLogger("uvicorn.access")
