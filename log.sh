@@ -1,6 +1,6 @@
-#! usr/bin/bash
+#!/usr/bin/bash
 
-CONTAINER = "kscu-web-server"
+CONTAINER="kscu-web-server"
 
 echo "Container Logs:"
 docker logs $CONTAINER --tail 200

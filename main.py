@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI):
 #Show recorder instantiation
 rc = ShowRecorder(db)
 
-app = FastAPI(lifespan = lifespan, redirect_slashes= False)
+app = FastAPI(lifespan = lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -56,7 +56,7 @@ class QuietLogger(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         #Old stubborn URLs. Deprecated.
         msg = record.getMessage()
-        return "/spins/get" not in msg and "shows/get" not in msg and "/shows/update"
+        return "/spins/get" not in msg and "/spins/update" not in msg and "shows/get" not in msg and "/shows/update"
 
 # 2. Apply it to the uvicorn access logger
 logger = logging.getLogger("uvicorn.access")
