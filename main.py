@@ -167,7 +167,7 @@ async def streamEvents(request: Request):
                 if await request.is_disconnected(): break
 
                 try:
-                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    event = await asyncio.wait_for(queue.get(), timeout=20.0)
                     yield {
                     "event": event.type,
                     "data": event.message
@@ -178,6 +178,7 @@ async def streamEvents(request: Request):
             print(f"Stream error: {err}")
         finally:
             await eventManager.unsubscribe(queue)
+            del queue
 
     return EventSourceResponse(streamGenerator())
 

@@ -1,6 +1,5 @@
-import asyncio
+import asyncio, json
 from pydantic import BaseModel
-import json
 
 class EventModel(BaseModel):
     type: str
@@ -11,18 +10,28 @@ class SSEEventManager:
         self.subscribers = set()
 
     async def subscribe(self):
-        queue = asyncio.Queue()
+        queue = asyncio.Queue(maxsize=10)
         self.subscribers.add(queue)
+        print(f"New subscriber. Total: {len(self.subscribers)}")
         return queue
     
     async def unsubscribe(self, queue):
-        self.subscribers.discard(queue)
+        if queue in self.subscribers:
+            self.subscribers.remove(queue)
+            print(f"Lost subscriber. Total: {len(self.subscribers)}")
 
     async def emit(self, event: EventModel):
         if not self.subscribers: return
         for queue in self.subscribers:
-            await queue.put(event) 
-    
+            try:
+                queue.put_nowait(event)
+            except asyncio.QueueFull:
+            #Drop oldest event in queue
+                try:
+                    queue.get_nowait()
+                    queue.put_nowait(event)
+                except:
+                    pass
 
     async def event_generator(self):
         counter = 0
