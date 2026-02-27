@@ -136,20 +136,22 @@ class ShowRecorder:
             return
 
         try:
-            self.current_process = subprocess.Popen([
+            with subprocess.Popen([
                 "ffmpeg", "-y", "-i", self.STREAM_URL,
                 "-acodec", "libmp3lame",
                 filepath
-            ], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-
-            print(f"FFmpeg started.")
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) as proc:
+                self.current_process = proc
+                print(f"FFmpeg started.")
             
-            self.current_process.wait()
+                proc.wait()
+
             print(f"FFmpeg process finished for {show_title}.")
 
         except Exception as e:
             print(f"Error during recording: {e}")
             return
+        finally: self.current_process = None
 
         try:
             if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
@@ -176,7 +178,7 @@ class ShowRecorder:
 
     def record_show_threaded(self, show_data):
         self.executor.submit(self.record_show_safe, show_data)
-        
+
     def cleanup_old_temp_files(self):
         try:
             temp_files = [f for f in os.listdir('/tmp') if f.endswith('.mp3')]

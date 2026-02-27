@@ -9,9 +9,6 @@ from fastapi.responses import RedirectResponse
 class QueryService:
 
     def __init__(self, newFilename): 
-        self.conn = sqlite3.connect(newFilename, check_same_thread=False)
-        self.conn.row_factory = sqlite3.Row
-        self.cursor = self.conn.cursor()
         self.filename = newFilename
 
         self.automationDJ: str = os.getenv("AUTOMATION_DJ").strip()
@@ -25,10 +22,6 @@ class QueryService:
         self.authURL = os.getenv("AUTH_URL").strip()
         self.tokenURL = os.getenv("TOKEN_URL").strip()
         self.apiBaseURL = os.getenv("API_BASE_URL").strip()
-        
-    def close(self):
-        if self.conn:
-            self.conn.close()
 
     @staticmethod
     def dbTime():
@@ -57,11 +50,11 @@ class QueryService:
         currentTime = self.dbTime()
         with sqlite3.connect(self.filename) as conn:
             conn.row_factory = sqlite3.Row   
-            cursor = conn.execute(
+            rows = conn.execute(
                 "SELECT rowid, * FROM shows WHERE day_id = ? AND start_time <= ? AND end_time > ?", 
                 (weekday, currentTime, currentTime)
             ).fetchall()
-            shows = [dict(row) for row in cursor.fetchall()]
+            shows = [dict(row) for row in rows]
         if not shows: 
             return self.getAutoplay()
         return self.handleCohosts(shows)
@@ -95,11 +88,12 @@ class QueryService:
         return ", ".join(cleanedList[:-2] + [" & ".join(cleanedList[-2:])])
     
     def display(self):
-        self.cursor.execute('''SELECT "day_id", "show_title", "dj_name", "start_time", "end_time" FROM shows''')
-        rows = self.cursor.fetchall()
-        for row in rows:
-            print(f"Day: {row['day_id']} | Show: {row['show_title']} | DJ: {row['dj_name']} | Start Time: {row['start_time']} End Time: {row['end_time']}")
-    
+        with sqlite3.connect(self.filename) as conn:
+            conn.row_factory = sqlite3.Row   
+            rows = conn.execute('''SELECT "day_id", "show_title", "dj_name", "start_time", "end_time" FROM shows''').fetchall()
+            for row in rows:
+                print(f"Day: {row['day_id']} | Show: {row['show_title']} | DJ: {row['dj_name']} | Start Time: {row['start_time']} End Time: {row['end_time']}")
+        
     def getAutoplay(self):
         return {
                 "show_title": self.automationShow,
@@ -113,34 +107,34 @@ class QueryService:
         validFilter = 'AND "show_title" IS NOT NULL AND "show_title" != "" AND "show_title" != ?'
 
         # Query 1: Find the next valid slot
-        self.cursor.execute(
-            f"""
-            SELECT day_id, start_time FROM shows 
-            WHERE ((day_id > ?) OR (day_id = ? AND start_time > ?))
-            {validFilter}
-            ORDER BY day_id, start_time LIMIT 1
-            """,
-            (day, day, start, self.automationShow)
-        )
-        slot = self.cursor.fetchone()
+        with sqlite3.connect(self.filename) as conn:
+            conn.row_factory = sqlite3.Row
+            slot = conn.execute(
+                f"""
+                SELECT day_id, start_time FROM shows 
+                WHERE ((day_id > ?) OR (day_id = ? AND start_time > ?))
+                {validFilter}
+                ORDER BY day_id, start_time LIMIT 1
+                """,
+                (day, day, start, self.automationShow)
+            ).fetchone()
 
-        if slot is None:
-            self.cursor.execute(
-                f'SELECT day_id, start_time FROM shows WHERE 1=1 {validFilter} ORDER BY day_id, start_time LIMIT 1',
-                (self.automationShow,)
-            )
-            slot = self.cursor.fetchone()
+            if slot is None:
+                slot = conn.execute(
+                    f'SELECT day_id, start_time FROM shows WHERE 1=1 {validFilter} ORDER BY day_id, start_time LIMIT 1',
+                    (self.automationShow,)
+                ).fetchone()
 
-        if slot is None:
-            return self.getAutoplay()
+            if slot is None:
+                return self.getAutoplay()
 
-        self.cursor.execute(
-            f'SELECT rowid, * FROM shows WHERE day_id = ? AND start_time = ? {validFilter}',
-            (slot["day_id"], slot["start_time"], self.automationShow)
-        )
-        rows = self.cursor.fetchall()
+            rows = conn.execute(
+                f'SELECT rowid, * FROM shows WHERE day_id = ? AND start_time = ? {validFilter}',
+                (slot["day_id"], slot["start_time"], self.automationShow)
+            ).fetchall()
+            showList = [dict(r) for r in rows]
 
-        return self.handleCohosts(rows)
+        return self.handleCohosts(showList)
 
     async def dbCurrentTrack(self):
         token = await self.getAccessToken()
