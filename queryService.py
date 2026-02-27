@@ -55,12 +55,13 @@ class QueryService:
     def dbCurrentShow(self):
         weekday = self.dbWeekday()
         currentTime = self.dbTime()
-                
-        self.cursor.execute(
-            "SELECT rowid, * FROM shows WHERE day_id = ? AND start_time <= ? AND end_time > ?", 
-            (weekday, currentTime, currentTime)
-        )
-        shows = self.cursor.fetchall()
+        with sqlite3.connect(self.filename) as conn:
+            conn.row_factory = sqlite3.Row   
+            cursor = conn.execute(
+                "SELECT rowid, * FROM shows WHERE day_id = ? AND start_time <= ? AND end_time > ?", 
+                (weekday, currentTime, currentTime)
+            ).fetchall()
+            shows = [dict(row) for row in cursor.fetchall()]
         if not shows: 
             return self.getAutoplay()
         return self.handleCohosts(shows)

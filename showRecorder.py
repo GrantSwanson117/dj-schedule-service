@@ -1,15 +1,9 @@
-import os
-import io
-import time
-import schedule
-import subprocess
-import yagmail
-import boto3
-import threading
+import os, io, time, schedule, subprocess, yagmail, boto3, threading
 from textwrap import dedent
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from queryService import QueryService
+from concurrent.futures import ThreadPoolExecutor
 
 class ShowRecorder:
     def __init__(self, db: QueryService):
@@ -35,6 +29,9 @@ class ShowRecorder:
         self.recording_lock = threading.Lock()
 
         self.cleanup_old_temp_files()
+
+        self.executor = ThreadPoolExecutor(max_workers=2)
+        self.current_process = None
 
     @staticmethod
     def recorderHealthCheck():
@@ -178,8 +175,8 @@ class ShowRecorder:
             self.recording_lock.release()
 
     def record_show_threaded(self, show_data):
-        threading.Thread(target=self.record_show_safe, args=(show_data,)).start()
-
+        self.executor.submit(self.record_show_safe, show_data)
+        
     def cleanup_old_temp_files(self):
         try:
             temp_files = [f for f in os.listdir('/tmp') if f.endswith('.mp3')]
