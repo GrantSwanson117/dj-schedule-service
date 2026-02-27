@@ -115,6 +115,7 @@ def root(): return {
 @app.get("/healthcheck")
 def healthCheck(): return {"Server Status:": "OK", "Recorder Status": rc.recorderHealthCheck}
 
+@app.get("/tracks/current/")
 @app.get("/tracks/current")
 async def currentTrack():
     return await db.dbCurrentTrack()
@@ -125,10 +126,12 @@ async def currentTrack():
     return await db.dbCurrentTrack()
 
 #Returns 20 most recent tracks
+@app.get("/tracks/recent/")
 @app.get("/tracks/recent")
 async def recentTracks():
     return await db.dbRecentTracks()
 
+@app.get("/shows/current/")
 @app.get("/shows/current")
 async def currentShow():
     return db.dbCurrentShow()
@@ -148,6 +151,7 @@ async def get_my_token(code: str):
         )
         return response.json()
     
+@app.get("/shows/next/")
 @app.get("/shows/next")
 def getNextShow():
     return db.dbNextShow()    
