@@ -165,14 +165,17 @@ async def streamEvents(request: Request):
             while True:
                 # Check if client is still there
                 if await request.is_disconnected(): break
-                
-                event = await queue.get()
-                yield {
+
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield {
                     "event": event.type,
                     "data": event.message
-                }
-        except asyncio.TimeoutError:
-            yield ": Empty Request"
+                    }
+                except asyncio.TimeoutError:
+                    yield ": Empty Request\n\n"
+        except Exception as err:
+            print(f"Stream error: {err}")
         finally:
             await eventManager.unsubscribe(queue)
 
