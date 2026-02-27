@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
     recorderTask.cancel()
 
 #Show recorder instantiation
-rc = ShowRecorder(db)
+#rc = ShowRecorder(db)
 
 app = FastAPI(lifespan = lifespan)
 
