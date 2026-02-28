@@ -201,7 +201,7 @@ class ShowRecorder:
 
             if self.last_recorded_show != show_id:
                 
-                if hasattr(self, 'current_process') and self.current_process.poll() is None:
+                if self.current_process is not None and self.current_process.poll() is None:
                     print(f"Ending current recording to start new show or automation.")
                     self.current_process.terminate()
                     

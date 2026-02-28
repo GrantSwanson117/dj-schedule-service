@@ -167,29 +167,29 @@ def getNextShow():
 
 @app.get("/stream")
 async def streamEvents(request: Request):
+    # 1. Define the queue in the outer scope
     queue = await eventManager.subscribe()
 
-    async def streamGenerator():
+    async def streamGenerator(q): # 2. Pass the queue in as an argument
         try:
             while True:
-                # Check if client is still there
-                if await request.is_disconnected(): break
+                if await request.is_disconnected(): 
+                    break
 
                 try:
-                    event = await asyncio.wait_for(queue.get(), timeout=20.0)
+                    event = await asyncio.wait_for(q.get(), timeout=20.0)
                     yield {
-                    "event": event.type,
-                    "data": event.message
+                        "event": event["event"],
+                        "data": event["data"]
                     }
                 except asyncio.TimeoutError:
-                    yield ": Empty Request\n\n"
+                    yield ": heartbeat\n\n"
         except Exception as err:
             print(f"Stream error: {err}")
         finally:
-            await eventManager.unsubscribe(queue)
-            del queue
+            await eventManager.unsubscribe(q)
 
-    return EventSourceResponse(streamGenerator())
+    return EventSourceResponse(streamGenerator(queue))
 
 @app.post("/emit")
 async def newEvent(event: EventModel):
