@@ -2,7 +2,6 @@ import sqlite3
 from datetime import datetime
 import formatDB
 import os
-import httpx
 from datetime import datetime
 from fastapi.responses import RedirectResponse
 
