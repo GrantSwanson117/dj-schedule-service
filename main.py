@@ -30,17 +30,22 @@ eventManager = SSEEventManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    trackTask = asyncio.create_task(trackWatchdog())
-    showTask = asyncio.create_task(showWatchdog())
-    recorderTask = asyncio.create_task(asyncio.to_thread(rc.run))
-    yield
-    # At shutdown
-    trackTask.cancel()
-    showTask.cancel()
-    recorderTask.cancel()
+    # Create ONE client for the whole app
+    async with httpx.AsyncClient() as client:
+        db.client = client
+        
+        trackTask = asyncio.create_task(trackWatchdog())
+        showTask = asyncio.create_task(showWatchdog())
+        recorderTask = asyncio.create_task(asyncio.to_thread(rc.run))
+        
+        yield
+        
+        trackTask.cancel()
+        showTask.cancel()
+        recorderTask.cancel()
 
 #Show recorder instantiation
-#rc = ShowRecorder(db)
+rc = ShowRecorder(db)
 
 app = FastAPI(lifespan = lifespan)
 
@@ -72,33 +77,38 @@ async def trackWatchdog():
                 currTrackID = track["id"]
                 if currTrackID != prevtrackID:
                     await eventManager.emit(EventModel(
-                        type=json.dumps("trackUpdate"),
-                        message=json.dumps(f"{track['name']} - {track['artists']}")
+                    type="trackUpdate",
+                    message=f"{track['name']} - {track['artists']}"
                     ))
                     prevtrackID = currTrackID
-                    print(f"""New Track: '{track['name']}' - {track['artists']}""")
+            
+            del track 
             
         except Exception as e:
             print(f"Watchdog Error: {e}")
-        await asyncio.sleep(10)
 
+        await asyncio.sleep(10)
 async def showWatchdog():
     prevShow = None
     while True:
         try:
             show = db.dbCurrentShow()
             if show:
-                currShow = show["show_title"]
+                currShow = show.get("show_title")
                 if currShow != prevShow:
                     await eventManager.emit(EventModel(
-                        type=json.dumps("showUpdate"),
-                        message=json.dumps(f"{show['show_title']} - {show['dj_name']}")
+                        type="showUpdate",
+                        message=f"{show['show_title']} - {show['dj_name']}"
                     ))
                     prevShow = currShow
-                    print(f"""New Show: '{show['show_title']}' - {show['dj_name']}""")
-                    
+                    print(f"New Show: '{show['show_title']}' - {show['dj_name']}")
+            
+            show = None 
+            del show
+
         except Exception as e:
             print(f"Watchdog Error: {e}")
+            
         await asyncio.sleep(10)
 
 @app.get("/")
@@ -138,18 +148,17 @@ async def currentShow():
 
 @app.get("/get-token")
 async def get_my_token(code: str):
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            tokenURL,
-            data={
-                'grant_type': 'authorization_code',
-                'code': code,
-                'redirect_uri': redirectURI,
-                'client_id': clientID,
-                'client_secret': clientSecret,
-            }
-        )
-        return response.json()
+    response = await db.client.post(
+        tokenURL,
+        data={
+            'grant_type': 'authorization_code',
+            'code': code,
+            'redirect_uri': redirectURI,
+            'client_id': clientID,
+            'client_secret': clientSecret,
+        }
+    )
+    return response.json()
     
 @app.get("/shows/next/")
 @app.get("/shows/next")

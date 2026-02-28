@@ -23,6 +23,9 @@ class QueryService:
         self.tokenURL = os.getenv("TOKEN_URL").strip()
         self.apiBaseURL = os.getenv("API_BASE_URL").strip()
 
+    def set_client(self, client):
+        self.client = client
+
     @staticmethod
     def dbTime():
         return datetime.now().hour * 60 + datetime.now().minute
@@ -32,8 +35,7 @@ class QueryService:
         return datetime.now().weekday()
          
     async def getAccessToken(self):
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
+            response = await self.client.post(
                 self.tokenURL,
                 data={
                     "grant_type": "refresh_token",
@@ -139,11 +141,10 @@ class QueryService:
     async def dbCurrentTrack(self):
         token = await self.getAccessToken()
         
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{self.apiBaseURL}/me/player/currently-playing",
-                headers={"Authorization": f"Bearer {token}"}
-            )
+        response = await self.client.get(
+            f"{self.apiBaseURL}/me/player/currently-playing",
+            headers={"Authorization": f"Bearer {token}"}
+        )
 
         if response.status_code == 204 or response.status_code == 404:
             return {"message": "No track currently playing"}
@@ -167,12 +168,11 @@ class QueryService:
         if not token:
             return RedirectResponse(url="/login")
 
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                "https://api.spotify.com/v1/me/player/recently-played",
-                headers={"Authorization": f"Bearer {token}"}
-            )
-            data = response.json()
+        response = await self.client.get(
+            "https://api.spotify.com/v1/me/player/recently-played?limit=15",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        data = response.json()
 
         recentTracks = []
         #Using a set to avoid duplicate songs. Check if ID was already added to set, and
