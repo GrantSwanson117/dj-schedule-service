@@ -1,6 +1,7 @@
-import os, httpx, json, asyncio, logging
+import os, httpx, json, asyncio, logging, gc
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
+from datetime import datetime
 from sse_starlette.sse import EventSourceResponse
 from fastapi.middleware.cors import CORSMiddleware
 from queryService import QueryService
@@ -30,7 +31,6 @@ eventManager = SSEEventManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create ONE client for the whole app
     async with httpx.AsyncClient() as client:
         db.client = client
         
@@ -63,7 +63,6 @@ class QuietLogger(logging.Filter):
         msg = record.getMessage()
         return "/spins/get" not in msg and "/spins/update" not in msg and "shows/get" not in msg and "/shows/update"
 
-# 2. Apply it to the uvicorn access logger
 logger = logging.getLogger("uvicorn.access")
 logger.addFilter(QuietLogger())
 
@@ -87,6 +86,8 @@ async def trackWatchdog():
         except Exception as e:
             print(f"Watchdog Error: {e}")
 
+        if datetime.now().minute == 0:
+            gc.collect()
         await asyncio.sleep(10)
 async def showWatchdog():
     prevShow = None
@@ -109,6 +110,8 @@ async def showWatchdog():
         except Exception as e:
             print(f"Watchdog Error: {e}")
             
+        if datetime.now().minute == 0:
+            gc.collect()
         await asyncio.sleep(10)
 
 @app.get("/")
@@ -167,10 +170,9 @@ def getNextShow():
 
 @app.get("/stream")
 async def streamEvents(request: Request):
-    # 1. Define the queue in the outer scope
     queue = await eventManager.subscribe()
 
-    async def streamGenerator(q): # 2. Pass the queue in as an argument
+    async def streamGenerator(q):
         try:
             while True:
                 if await request.is_disconnected(): 

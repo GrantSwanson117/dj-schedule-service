@@ -30,7 +30,7 @@ class ShowRecorder:
 
         self.cleanup_old_temp_files()
 
-        self.executor = ThreadPoolExecutor(max_workers=2)
+        self.executor = ThreadPoolExecutor(max_workers=1)
         self.current_process = None
 
     @staticmethod
