@@ -10,8 +10,9 @@ class QueryService:
     def __init__(self, newFilename): 
         self.filename = newFilename
 
-        self.automationDJ: str = os.getenv("AUTOMATION_DJ").strip()
-        self.automationShow: str = os.getenv("AUTOMATION_SHOW").strip()
+        self.automationDJ: str = "KSCU Bot"
+        self.automationShow: str = "KSCU Autoplay"
+        self.automationMsg: str = "Non-Stop Music"
 
         self.refreshToken = os.getenv("SPOTIFY_REFRESH_TOKEN").strip()
 
@@ -99,7 +100,7 @@ class QueryService:
         return {
                 "show_title": self.automationShow,
                 "dj_name": self.automationDJ,
-                "start_time": None,
+                "start_time": self.automationMsg,
                 "end_time": None
                 }
     
