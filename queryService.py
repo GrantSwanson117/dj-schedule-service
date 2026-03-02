@@ -18,11 +18,13 @@ class QueryService:
             "Up all Night to get Lucky", 
             "KSCU's Nocturnal DJ", 
             "Your 2 A.M Hallucination",
+            "Stream Astrakinetic",
             "Sleepless in Santa Clara", 
             "Autonomous Audio", 
             "Dreams Amidst Radio Waves",
             "At This Hour!?",
-            "Keep the Signal Alive"]
+            "Keep the Signal Alive",
+            "I'm Batman"]
 
         self.refreshToken = os.getenv("SPOTIFY_REFRESH_TOKEN").strip()
 
@@ -80,7 +82,7 @@ class QueryService:
         
         for show in showList[1:]:
             if show["show_title"] != firstShow["show_title"]:
-                raise ValueError("Show scheduling error: Multiple shows in the same timeslot.")
+                raise ValueError("SYSTEM: Show scheduling error: Multiple shows in the same timeslot.")
             elif show["dj_name"] != firstShow["dj_name"]:
                 djList.append(show["dj_name"])
                 emailList.append(show["email"])

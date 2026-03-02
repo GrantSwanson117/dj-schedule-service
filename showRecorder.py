@@ -56,13 +56,13 @@ class ShowRecorder:
         return list(show_data.get('email'))
     
     def upload_to_s3(self, filepath, filename):
-        print(f"Uploading {filename} to S3")
+        print(f"SYSTEM: Uploading {filename} to S3")
         try:
             self.s3_client.upload_file(filepath, self.S3_BUCKET, filename)
-            print(f"Uploaded {filename} to S3 bucket {self.S3_BUCKET}")
+            print(f"SYSTEM: Uploaded {filename} to S3 bucket {self.S3_BUCKET}")
             return True
         except Exception as e:
-            print(f"Failed to upload to S3: {e}")
+            print(f"SYSTEM: Failed to upload to S3: {e}")
             return False
         
     def get_s3_fileobj(self, bucket, key):
@@ -73,7 +73,7 @@ class ShowRecorder:
 
     def send_email_with_attachment(self, bucket_name, filename, dj_emails, names, show_title, date_str):
         if len(dj_emails) != len(names):
-            print("DJ name and email mismatch. Please check database and reupload.")
+            print("SYSTEM: DJ name and email mismatch. Please check database and reupload.")
             return False
             
         url = self.s3_client.generate_presigned_url(
@@ -113,7 +113,7 @@ class ShowRecorder:
             print(f"Error deleting temp file {filepath}: {e}")
 
     def record_show(self, show_data):
-        print("Starting show recording...")
+        print("SYSTEM: Starting show recording...")
         local_tz = ZoneInfo("America/Los_Angeles")
         recording_start_time = datetime.now(local_tz)
 
@@ -121,8 +121,8 @@ class ShowRecorder:
         show_title = self.getShowName(show_data)
         dj_emails = self.getEmail(show_data)
         
-        print(f"Recording started at: {recording_start_time.strftime('%H:%M:%S')}")
-        print(f"DJ Info - Name: {names}, Show: {show_title}")
+        print(f"SYSTEM: Recording started at: {recording_start_time.strftime('%H:%M:%S')}")
+        print(f"SYSTEM: DJ Info - Name: {names}, Show: {show_title}")
 
         now = recording_start_time.strftime("%m-%d-%Y")
         hour = recording_start_time.strftime("%H")
@@ -130,10 +130,6 @@ class ShowRecorder:
         safe_title = "".join([c if c.isalnum() else "_" for c in show_title])
         filename = f"{safe_title}_{now}_{hour}00.mp3"
         filepath = f"/tmp/{filename}"
-
-        if 1 <= recording_start_time.hour < 7:
-            print("Skipping recording: between 1am and 7am.")
-            return
 
         try:
             with subprocess.Popen([
@@ -146,7 +142,7 @@ class ShowRecorder:
             
                 proc.wait()
 
-            print(f"FFmpeg process finished for {show_title}.")
+            print(f"SYSTEM: FFmpeg process finished for {show_title}.")
 
         except Exception as e:
             print(f"Error during recording: {e}")
@@ -163,13 +159,13 @@ class ShowRecorder:
             else:
                 print(f"File {filepath} was empty or not found. Skipping upload.")
         except Exception as e:
-            print(f"Failed post-recording steps: {e}")
+            print(f"SYSTEM: Failed post-recording steps: {e}")
         finally:
             self.cleanup_temp_file(filepath)
         
     def record_show_safe(self, show_data):
         if not self.recording_lock.acquire():
-            print("Recording in progress, skipping this check")
+            print("SYSTEM: Recording in progress, skipping this check")
             return
         try:
             self.record_show(show_data)
@@ -185,9 +181,9 @@ class ShowRecorder:
             for temp_file in temp_files:
                 self.cleanup_temp_file(os.path.join('/tmp', temp_file))
             if temp_files:
-                print(f"cleaned up {len(temp_files)} temp files on startup")
+                print(f"SYSTEM: cleaned up {len(temp_files)} temp files on startup")
         except Exception as e:
-            print(f"error cleaning old files: {e}")
+            print(f"SYSTEM: error cleaning old files: {e}")
 
     def check_and_record(self):
         try:
@@ -202,7 +198,7 @@ class ShowRecorder:
             if self.last_recorded_show != show_id:
                 
                 if self.current_process is not None and self.current_process.poll() is None:
-                    print(f"Ending current recording to start new show or automation.")
+                    print(f"SYSTEM: Ending current recording to start new show or automation.")
                     self.current_process.terminate()
                     
                     #Buffer to let other threads finish
@@ -211,15 +207,15 @@ class ShowRecorder:
                 dj = show.get('dj_name')
                 
                 if dj != self.database.automationDJ:
-                    print(f"New show detected: {show['show_title']} - {dj}")
+                    print(f"SYSTEM: New show detected: {show['show_title']} - {dj}")
                     self.record_show_threaded(show)
                     self.last_recorded_show = show_id
                 else:
-                    print("Automated show.")
+                    print("SYSTEM: Automated show.")
                     self.last_recorded_show = show_id
 
         except Exception as e:
-            print(f"Check error: {e}")
+            print(f"SYSTEM: Check error: {e}")
 
     def run(self):
         schedule.every(60).seconds.do(self.check_and_record)

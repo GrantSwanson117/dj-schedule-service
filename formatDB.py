@@ -11,27 +11,27 @@ def addNewColumns(columnList):
     for i in columnList:
         if i not in columns:
             cursor.execute(f'ALTER TABLE shows ADD COLUMN {i} INT')
-    print("Database columns set.")
+    print("SYSTEM: Database columns set.")
     
 
 def normalizeTime(timeStr):
     
     if '-' not in timeStr:
-        print('Time formatted incorrectly. Ensure a dash sits between the times and AM/PM is specified at the end.')
+        print('SYSTEM: Time formatted incorrectly. Ensure a dash sits between the times and AM/PM is specified at the end.')
         return
     
     strippedTime = timeStr.replace(" ", "").replace(".", "").replace("(cohost)", "").lower()
 
     ampm = strippedTime[-2:]
     if ampm not in ('am', 'pm'):
-        print('Time formatted incorrectly. Ensure AM/PM is specified at the end.')
+        print('SYSTEM: Time formatted incorrectly. Ensure AM/PM is specified at the end.')
         return
 
     strippedTime = strippedTime.replace('am', '').replace('pm', '')
     parts = strippedTime.split('-')
 
     if len(parts) != 2:
-        print('Time formatted incorrectly.')
+        print('SYSTEM: Time formatted incorrectly.')
         return
 
     times = []
@@ -81,7 +81,7 @@ def settimeslots():
                 'UPDATE shows SET "start_time" = ?, "end_time" = ? WHERE rowid = ?',
                 (start, end, rowid)
             )
-    print("timeslots set.")
+    print("SYSTEM: timeslots set.")
 def setDayIDs():
     dayIDs = {
         'monday': 0,
@@ -95,7 +95,7 @@ def setDayIDs():
     cursor.execute("UPDATE shows SET Day = LOWER(TRIM(Day))")
     for day, id in dayIDs.items():
         cursor.execute('UPDATE shows SET "day_id" = ? WHERE "Day" = ?', (id, day))
-    print("Day IDs set.")
+    print("SYSTEM: Day IDs set.")
 
 requiredColumns = ["day", "timeslot", "show_title", "dj_name"]
 newColumns = ["start_time", "end_time", "day_id"]
