@@ -91,14 +91,16 @@ class QueryService:
     def display(self):
         with sqlite3.connect(self.filename) as conn:
             conn.row_factory = sqlite3.Row   
-            rows = conn.execute('''SELECT "day_id", "show_title", "dj_name", "start_time", "end_time" FROM shows''').fetchall()
+            rows = conn.execute('''SELECT "day", "show_title", "dj_name", "start_time", "end_time" FROM shows''').fetchall()
             for row in rows:
-                print(f"Day: {row['day_id']} | Show: {row['show_title']} | DJ: {row['dj_name']} | Start Time: {row['start_time']} End Time: {row['end_time']}")
-        
+                print(f"Day: {row['day']} | Show: {row['show_title']} | DJ: {row['dj_name']} | Start Time: {row['start_time']} End Time: {row['end_time']}")
+            return rows        
     def getAutoplay(self):
         return {
                 "show_title": self.automationShow,
-                "dj_name": self.automationDJ
+                "dj_name": self.automationDJ,
+                "start_time": None,
+                "end_time": None
                 }
     
     def dbNextShow(self):
@@ -107,7 +109,6 @@ class QueryService:
 
         validFilter = 'AND "show_title" IS NOT NULL AND "show_title" != "" AND "show_title" != ?'
 
-        # Query 1: Find the next valid slot
         with sqlite3.connect(self.filename) as conn:
             conn.row_factory = sqlite3.Row
             slot = conn.execute(

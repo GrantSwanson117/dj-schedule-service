@@ -118,23 +118,21 @@ async def showWatchdog():
 def root(): return {
     "Hello!": "welcome to the KSCU web server! the following endpoints are used for data fetching and monitoring.",
     "/": "root, for help and info",
-    "/shows/current": "show currently playing",
+    "/shows/current": "current show on air",
     "/stream": "real-time SSE stream for new shows and tracks",
     "/shows/next": "next show scheduled to play (ignoring automated shows)",
-    "/tracks/current": "current track playing",
+    "/tracks/current": "current track on air",
     "/tracks/recent": "returns the 20 most recently played tracks",
+    "/schedule": "A display of every show in the current DJ schedule"
 }
 
 @app.get("/healthcheck")
-def healthCheck(): return {"Server Status:": "OK", "Recorder Status": rc.recorderHealthCheck}
-
-@app.get("/tracks/current/")
-@app.get("/tracks/current")
-async def currentTrack():
-    return await db.dbCurrentTrack()
+def healthCheck(): return {"Server Status:": "OK", "Recorder Status": rc.recorderHealthCheck()}
 
 #Legacy URL
 @app.get("/spins/get")
+@app.get("/tracks/current/")
+@app.get("/tracks/current")
 async def currentTrack():
     return await db.dbCurrentTrack()
 
@@ -167,6 +165,10 @@ async def get_my_token(code: str):
 @app.get("/shows/next")
 def getNextShow():
     return db.dbNextShow()    
+
+@app.get("/schedule")
+def displaySchedule():
+    return db.display()
 
 @app.get("/stream")
 async def streamEvents(request: Request):
