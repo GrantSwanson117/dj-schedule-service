@@ -2,11 +2,9 @@
 
 CONTAINER="kscu-web-server"
 
-echo "Container Logs:"
+echo "Container Logs (Traffic excluded):"
 docker logs $CONTAINER --tail 200
+# | grep "SYSTEM"
 
 echo "Resource Usage:"
 docker stats $CONTAINER --no-stream
-
-echo "Network connections:"
-docker exec $CONTAINER netstat -an

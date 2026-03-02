@@ -1,6 +1,7 @@
 import sqlite3
 from datetime import datetime
 import formatDB
+import random
 import os
 from datetime import datetime
 from fastapi.responses import RedirectResponse
@@ -12,7 +13,16 @@ class QueryService:
 
         self.automationDJ: str = "KSCU Bot"
         self.automationShow: str = "KSCU Autoplay"
-        self.automationMsg: str = "Non-Stop Music"
+        self.automationMsgs: str = [
+            "Music Never Stops", 
+            "Up all Night to get Lucky", 
+            "KSCU's Nocturnal DJ", 
+            "Your 2 A.M Hallucination",
+            "Sleepless in Santa Clara", 
+            "Autonomous Audio", 
+            "Dreams Amidst Radio Waves",
+            "At This Hour!?",
+            "Keep the Signal Alive"]
 
         self.refreshToken = os.getenv("SPOTIFY_REFRESH_TOKEN").strip()
 
@@ -93,14 +103,12 @@ class QueryService:
         with sqlite3.connect(self.filename) as conn:
             conn.row_factory = sqlite3.Row   
             rows = conn.execute('''SELECT "day", "show_title", "dj_name", "start_time", "end_time" FROM shows''').fetchall()
-            for row in rows:
-                print(f"Day: {row['day']} | Show: {row['show_title']} | DJ: {row['dj_name']} | Start Time: {row['start_time']} End Time: {row['end_time']}")
             return rows        
     def getAutoplay(self):
         return {
                 "show_title": self.automationShow,
                 "dj_name": self.automationDJ,
-                "start_time": self.automationMsg,
+                "start_time": random.choice(self.automationMsgs),
                 "end_time": None
                 }
     
