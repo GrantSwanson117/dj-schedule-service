@@ -112,7 +112,7 @@ async def showWatchdog():
                 prevViewers = currViewers
                 print(f"SYSTEM: Viewer count: {currViewers}")
 
-            show = prevViewers = None 
+            show = None 
             del show, currViewers
 
         except Exception as e:

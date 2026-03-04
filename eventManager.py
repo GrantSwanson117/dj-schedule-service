@@ -1,6 +1,4 @@
 import asyncio
-import json
-import weakref
 from pydantic import BaseModel
 
 class EventModel(BaseModel):
@@ -9,7 +7,7 @@ class EventModel(BaseModel):
 
 class SSEEventManager:
     def __init__(self):
-        self.subscribers = weakref.WeakSet()
+        self.subscribers = set()
 
     async def subscribe(self):
         queue = asyncio.Queue(maxsize=15)
@@ -18,7 +16,7 @@ class SSEEventManager:
     
     async def unsubscribe(self, queue): self.subscribers.discard(queue)
 
-    async def getViewers(self): return len(self.subscribers)
+    def getViewers(self): return len(list(self.subscribers))
 
     async def emit(self, event: EventModel):
         if not self.subscribers: 
