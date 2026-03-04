@@ -14,12 +14,11 @@ class SSEEventManager:
     async def subscribe(self):
         queue = asyncio.Queue(maxsize=15)
         self.subscribers.add(queue)
-        print(f"SYSTEM: Viewer Count: {len(self.subscribers)}")
         return queue
     
-    async def unsubscribe(self, queue):
-        self.subscribers.discard(queue)
-        print(f"SYSTEM: Viewer Count: {len(self.subscribers)}")
+    async def unsubscribe(self, queue): self.subscribers.discard(queue)
+
+    async def getViewers(self): return len(self.subscribers)
 
     async def emit(self, event: EventModel):
         if not self.subscribers: 

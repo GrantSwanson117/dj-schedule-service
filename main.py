@@ -90,7 +90,7 @@ async def trackWatchdog():
             gc.collect()
         await asyncio.sleep(10)
 async def showWatchdog():
-    prevShow = None
+    prevShow = prevViewers = None
     while True:
         try:
             show = db.dbCurrentShow()
@@ -102,10 +102,18 @@ async def showWatchdog():
                         message=f"{show['show_title']} - {show['dj_name']}"
                     ))
                     prevShow = currShow
-                    print(f"New Show: '{show['show_title']}' - {show['dj_name']}")
-            
-            show = None 
-            del show
+                    print(f"SYSTEM: New Show: '{show['show_title']}' - {show['dj_name']}")
+            currViewers = eventManager.getViewers()
+            if currViewers != prevViewers:
+                await eventManager.emit(EventModel(
+                    type="viewsUpdate",
+                    message=f"Viewer count: {currViewers}"
+                ))
+                prevViewers = currViewers
+                print(f"SYSTEM: Viewer count: {currViewers}")
+
+            show = prevViewers = None 
+            del show, currViewers
 
         except Exception as e:
             print(f"Watchdog Error: {e}")
