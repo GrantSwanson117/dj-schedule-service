@@ -12,6 +12,13 @@ class SSEEventManager:
     async def subscribe(self):
         queue = asyncio.Queue(maxsize=15)
         self.subscribers.add(queue)
+
+        currentViewers = len(self.subscribers)
+        await queue.put({
+            "event": "viewsUpdate",
+            "data": str(currentViewers)
+        })
+
         return queue
     
     async def unsubscribe(self, queue): self.subscribers.discard(queue)

@@ -107,7 +107,7 @@ async def showWatchdog():
             if currViewers != prevViewers:
                 await eventManager.emit(EventModel(
                     type="viewsUpdate",
-                    message=f"Viewer count: {currViewers}"
+                    message=str(currViewers)
                 ))
                 prevViewers = currViewers
                 print(f"SYSTEM: Viewer count: {currViewers}")
