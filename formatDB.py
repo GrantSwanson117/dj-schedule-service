@@ -101,13 +101,16 @@ requiredColumns = ["day", "timeslot", "show_title", "dj_name"]
 newColumns = ["start_time", "end_time", "day_id"]
 
 def formatDB(filename):
-    conn = sqlite3.connect(filename)
-    global cursor
-    cursor = conn.cursor()
-    addNewColumns(newColumns)
-    settimeslots()
-    setDayIDs()
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(filename)
+        global cursor
+        cursor = conn.cursor()
+        addNewColumns(newColumns)
+        settimeslots()
+        setDayIDs()
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"SYSTEM: {e}")
 
 

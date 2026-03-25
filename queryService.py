@@ -12,7 +12,7 @@ class QueryService:
         self.filename = newFilename
 
         self.automationDJ: str = "KSCU Bot"
-        self.automationShow: str = "KSCU Autoplay"
+        self.automationShow: str = "Spring Break Radio!"
         self.automationMsgs: str = [
             "Music Never Stops", 
             "Up all Night to get Lucky", 
@@ -63,25 +63,28 @@ class QueryService:
         weekday = self.dbWeekday()
         yesterday = (weekday - 1) % 7
         currentTime = self.dbTime()
+        shows = []
         
         with sqlite3.connect(self.filename) as conn:
-            conn.row_factory = sqlite3.Row   
-            query = """
-                SELECT rowid, * FROM shows 
-                WHERE (
-                    day_id = ? 
-                    AND start_time <= ? 
-                    AND (CASE WHEN end_time = 0 THEN 1440 ELSE end_time END) > ?
-                )
-                OR (
-                    day_id = ? 
-                    AND start_time > (CASE WHEN end_time = 0 THEN 1440 ELSE end_time END) 
-                    AND (CASE WHEN end_time = 0 THEN 1440 ELSE end_time END) > ?
-                )
-            """
-            rows = conn.execute(query, (weekday, currentTime, currentTime, yesterday, currentTime)).fetchall()
-            shows = [dict(row) for row in rows]
-            
+            try:
+                conn.row_factory = sqlite3.Row   
+                query = """
+                    SELECT rowid, * FROM shows 
+                    WHERE (
+                        day_id = ? 
+                        AND start_time <= ? 
+                        AND (CASE WHEN end_time = 0 THEN 1440 ELSE end_time END) > ?
+                    )
+                    OR (
+                        day_id = ? 
+                        AND start_time > (CASE WHEN end_time = 0 THEN 1440 ELSE end_time END) 
+                        AND (CASE WHEN end_time = 0 THEN 1440 ELSE end_time END) > ?
+                    )
+                """
+                rows = conn.execute(query, (weekday, currentTime, currentTime, yesterday, currentTime)).fetchall()
+                shows = [dict(row) for row in rows]
+            except Exception: pass
+
         if not shows: 
             return self.getAutoplay()
         return self.handleCohosts(shows)
@@ -130,37 +133,42 @@ class QueryService:
     def dbNextShow(self):
         day = self.dbWeekday()
         start = self.dbTime()
+        shows = []
 
         validFilter = 'AND "show_title" IS NOT NULL AND "show_title" != "" AND "show_title" != ?'
-
-        with sqlite3.connect(self.filename) as conn:
-            conn.row_factory = sqlite3.Row
-            slot = conn.execute(
-                f"""
-                SELECT day_id, start_time FROM shows 
-                WHERE ((day_id > ?) OR (day_id = ? AND start_time > ?))
-                {validFilter}
-                ORDER BY day_id, start_time LIMIT 1
-                """,
-                (day, day, start, self.automationShow)
-            ).fetchone()
-
-            if slot is None:
+        try:
+            with sqlite3.connect(self.filename) as conn:
+                conn.row_factory = sqlite3.Row
                 slot = conn.execute(
-                    f'SELECT day_id, start_time FROM shows WHERE 1=1 {validFilter} ORDER BY day_id, start_time LIMIT 1',
-                    (self.automationShow,)
+                    f"""
+                    SELECT day_id, start_time FROM shows 
+                    WHERE ((day_id > ?) OR (day_id = ? AND start_time > ?))
+                    {validFilter}
+                    ORDER BY day_id, start_time LIMIT 1
+                    """,
+                    (day, day, start, self.automationShow)
                 ).fetchone()
 
-            if slot is None:
-                return self.getAutoplay()
+                if slot is None:
+                    slot = conn.execute(
+                        f'SELECT day_id, start_time FROM shows WHERE 1=1 {validFilter} ORDER BY day_id, start_time LIMIT 1',
+                        (self.automationShow,)
+                    ).fetchone()
 
-            rows = conn.execute(
-                f'SELECT rowid, * FROM shows WHERE day_id = ? AND start_time = ? {validFilter}',
-                (slot["day_id"], slot["start_time"], self.automationShow)
-            ).fetchall()
-            showList = [dict(r) for r in rows]
+                if slot is None:
+                    return self.getAutoplay()
 
-        return self.handleCohosts(showList)
+                rows = conn.execute(
+                    f'SELECT rowid, * FROM shows WHERE day_id = ? AND start_time = ? {validFilter}',
+                    (slot["day_id"], slot["start_time"], self.automationShow)
+                ).fetchall()
+                shows = [dict(r) for r in rows]
+                
+        except Exception: pass
+
+        if not shows:
+            return self.getAutoplay()
+        return self.handleCohosts(shows)
 
     async def dbCurrentTrack(self):
         token = await self.getAccessToken()
