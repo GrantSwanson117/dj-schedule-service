@@ -14,7 +14,7 @@ class QueryService:
         self.filename = newFilename
 
         self.automationDJ: str = "KSCU Bot"
-        self.automationShow: str = "Spring Break Radio!"
+        self.automationShow: str = "KSCU Autoplay"
         self.automationMsgs: str = [
             "Music Never Stops", 
             "Up all Night to get Lucky", 
@@ -193,6 +193,11 @@ class QueryService:
             await asyncio.sleep(retryAfter)
             self.activeToken = None 
 
+        if response.status_code == 401:
+            print("SYSTEM: Spotify API token expired/invalid. Refreshing token.")
+            self.activeToken = None
+            return await self._fetchCurrentTrack()
+
         if response.status_code != 200:
             return {"SYSTEM": "Unable to retrieve track info"} 
              
@@ -226,6 +231,12 @@ class QueryService:
         print(f"Status: {response.status_code}")
         print(f"Content length: {len(response.content)}")
         print(f"Body preview: {response.text[:200]}")
+
+        if response.status_code == 401:
+            print("SYSTEM: Spotify API token expired/invalid. Refreshing token.")
+            self.activeToken = None
+            return await self._fetchCurrentTrack()
+
         if response.status_code != 200:
             return []
         
