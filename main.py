@@ -53,7 +53,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://kscu.org",
                    "http://localhost:8000",
-                   "http://127.0.0.1:8000",],
+                   "http://127.0.0.1:8000",
+                   "http://localhost:1313",
+                   "http://127.0.0.1:1313",],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"]

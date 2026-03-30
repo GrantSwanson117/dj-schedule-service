@@ -104,7 +104,7 @@ class ShowRecorder:
                 print(f"Error sending email to {dj_emails[i]}: {e}")
                 success = False
             
-            return success
+        return success
     def cleanup_temp_file(self, filepath):
         try:
             if os.path.exists(filepath):
