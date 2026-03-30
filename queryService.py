@@ -63,7 +63,14 @@ class QueryService:
         data = response.json()
         
         self.activeToken = data.get("access_token")
+        asyncio.create_task(self.expireToken(3000))
+
         return self.activeToken
+    
+    async def expireToken(self, delay):
+        await asyncio.sleep(delay)
+        self.activeToken = None
+        print("SYSTEM: Access token expired, will refresh on next request")
 
     def dbCurrentShow(self):
         weekday = self.dbWeekday()
