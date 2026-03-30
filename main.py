@@ -29,6 +29,9 @@ db = QueryService('schedule.db')
 db.dbFormat()
 eventManager = SSEEventManager()
 
+#Show recorder instantiation
+rc = ShowRecorder(db)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with httpx.AsyncClient() as client:
@@ -44,19 +47,17 @@ async def lifespan(app: FastAPI):
         showTask.cancel()
         recorderTask.cancel()
 
-#Show recorder instantiation
-rc = ShowRecorder(db)
-
 app = FastAPI(lifespan = lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=["https://kscu.org",
+                   "http://localhost:8000",
+                   "http://127.0.0.1:8000",],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"]
 )
-
 class QuietLogger(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         #Old stubborn URLs. Deprecated.
@@ -80,15 +81,14 @@ async def trackWatchdog():
                     message=f"{track['name']} - {track['artists']}"
                     ))
                     prevtrackID = currTrackID
-            
-            del track 
-            
+                        
         except Exception as e:
             print(f"Watchdog Error: {e}")
 
         if datetime.now().minute == 0:
             gc.collect()
-        await asyncio.sleep(10)
+        await asyncio.sleep(30)
+
 async def showWatchdog():
     prevShow = prevViewers = None
     while True:
@@ -120,7 +120,7 @@ async def showWatchdog():
             
         if datetime.now().minute == 0:
             gc.collect()
-        await asyncio.sleep(10)
+        await asyncio.sleep(30)
 
 @app.get("/")
 def root(): return {

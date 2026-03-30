@@ -139,7 +139,7 @@ class ShowRecorder:
             "-reconnect_streamed", "1", 
             "-reconnect_delay_max", "5", 
             "-i", self.STREAM_URL,
-            "-t", "18000", #Important: Shows will cut off at 5 hours no matter what. I've never seen a 5 hour show, but if there is one, this must be changed.
+            "-t", "18000", #Important: Shows will cut off at 5 hours no matter what. I've never seen a 5+ hour show, but if there is one, this must be changed.
             "-acodec", "libmp3lame",
             filepath
         ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) as proc:

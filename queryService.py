@@ -1,5 +1,7 @@
+import asyncio
 import sqlite3
 from datetime import datetime
+from urllib import response
 import formatDB
 import random
 import os
@@ -47,18 +49,22 @@ class QueryService:
         return datetime.now().weekday()
          
     async def getAccessToken(self):
-            response = await self.client.post(
-                self.tokenURL,
-                data={
-                    "grant_type": "refresh_token",
-                    "refresh_token": self.refreshToken,
-                    "client_id": self.clientID,
-                    "client_secret": self.clientSecret,
-                },
-            )
-            data = response.json()
-            return data.get("access_token")
+        if hasattr(self, "activeToken") and self.activeToken:
+            return self.activeToken
+        response = await self.client.post(
+            self.tokenURL,
+            data={
+                "grant_type": "refresh_token",
+                "refresh_token": self.refreshToken,
+                "client_id": self.clientID,
+                "client_secret": self.clientSecret,
+            },
+        )
+        data = response.json()
         
+        self.activeToken = data.get("access_token")
+        return self.activeToken
+
     def dbCurrentShow(self):
         weekday = self.dbWeekday()
         yesterday = (weekday - 1) % 7
@@ -179,15 +185,24 @@ class QueryService:
         )
 
         if response.status_code == 204 or response.status_code == 404:
-            return {"message": "No track currently playing"}
-        
+            return {"SYSTEM": "No track currently playing"}
+
+        if response.status_code == 429:
+            retryAfter = int(response.headers.get("Retry-After", 30))
+            print(f"SYSTEM: Spotify API rate currently limited. Retrying after {retryAfter} seconds.")
+            await asyncio.sleep(retryAfter)
+            self.activeToken = None 
+
+        if response.status_code != 200:
+            return {"SYSTEM": "Unable to retrieve track info"} 
+             
         data = response.json()
         track = data.get('item')
         if not track:
-            return {"message": "Unable to retrieve track info"}
+            return {"SYSTEM": "Unable to retrieve track info"}
         images = track.get('album', {}).get('images', [])
         releaseDate = track.get('album', {}).get('release_date', [])
-        return {
+        result = {
             "id": track.get('id'),
             "name": track.get('name'),
             "artists": self.grammaticalJoin([song['name'] for song in track.get('artists', [])]),
@@ -195,6 +210,9 @@ class QueryService:
             "image": images[0]['url'] if images else None,
             "release_date": releaseDate.split("-")[0] if releaseDate else None,
         }
+        self.cachedTrack = result
+        return result
+
     async def dbRecentTracks(self):
         token = await self.getAccessToken()
         if not token:
@@ -204,6 +222,13 @@ class QueryService:
             "https://api.spotify.com/v1/me/player/recently-played?limit=15",
             headers={"Authorization": f"Bearer {token}"}
         )
+
+        print(f"Status: {response.status_code}")
+        print(f"Content length: {len(response.content)}")
+        print(f"Body preview: {response.text[:200]}")
+        if response.status_code != 200:
+            return []
+        
         data = response.json()
 
         recentTracks = []
