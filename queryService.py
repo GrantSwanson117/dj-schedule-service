@@ -235,10 +235,6 @@ class QueryService:
             headers={"Authorization": f"Bearer {token}"}
         )
 
-        print(f"Status: {response.status_code}")
-        print(f"Content length: {len(response.content)}")
-        print(f"Body preview: {response.text[:200]}")
-
         if response.status_code == 401:
             print("SYSTEM: Spotify API token expired/invalid. Refreshing token.")
             self.activeToken = None
