@@ -32,6 +32,9 @@ eventManager = SSEEventManager()
 #Show recorder instantiation
 rc = ShowRecorder(db)
 
+sportsStatus = {"is_live": False}
+sportsPollInterval = 1800 #Checks if KSCU sports is live every 15 minutes
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with httpx.AsyncClient() as client:
@@ -39,6 +42,7 @@ async def lifespan(app: FastAPI):
         
         trackTask = asyncio.create_task(trackWatchdog())
         showTask = asyncio.create_task(showWatchdog())
+        sportsTask = asyncio.create_task(sportsWatchdog())
         recorderTask = asyncio.create_task(asyncio.to_thread(rc.run))
         
         yield
@@ -46,6 +50,7 @@ async def lifespan(app: FastAPI):
         trackTask.cancel()
         showTask.cancel()
         recorderTask.cancel()
+        sportsTask.cancel()
 
 app = FastAPI(lifespan = lifespan)
 
@@ -124,6 +129,27 @@ async def showWatchdog():
             gc.collect()
         await asyncio.sleep(30)
 
+async def getSportsLive():
+    async with httpx.AsyncClient() as client:
+        response = await client.get("http://api.mixlr.com/users/kscusports")
+        return {"is_live": response.json().get("is_live")}
+    
+async def sportsWatchdog():
+    lastStatus = None
+    currentStatus = await getSportsLive()
+
+    while True:
+        result = await getSportsLive()
+        currentStatus = result["is_live"]
+        if currentStatus != lastStatus:
+            lastStatus = currentStatus
+            sportsStatus["is_live"] = currentStatus
+            await eventManager.emit(EventModel(
+                type="sportsLiveUpdate",
+                message="true" if currentStatus else "false"))
+        await asyncio.sleep(sportsPollInterval)
+
+
 @app.get("/")
 def root(): return {
     "Hello!": "welcome to the KSCU web server! the following endpoints are used for data fetching and monitoring.",
@@ -179,10 +205,13 @@ def getNextShow():
 @app.get("/schedule")
 def displaySchedule():
     return db.display()
-
+        
 @app.get("/stream")
 async def streamEvents(request: Request):
     queue = await eventManager.subscribe()
+    await queue.put({
+    "event": "sportsLiveUpdate",
+    "data": "true" if sportsStatus["is_live"] else "false"})
 
     async def streamGenerator(q):
         try:
