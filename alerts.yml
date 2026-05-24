@@ -1,0 +1,19 @@
+groups:
+  - name: kscu
+    rules:
+      - alert: SiteDown
+        expr: up{job="kscu"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "KSCU API is down"
+          description: "kscuapi.org has been unreachable for more than 1 minute"
+      - alert: HighErrorRate  
+        expr: rate(http_requests_total{job="kscu", status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate on KSCU API"
+          description: "More than 5% of requests to kscuapi.org have resulted in 5xx errors over the last 5 minutes"
