@@ -52,3 +52,6 @@ services:
       - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml
     ports:
       - "9093:9093"
+  
+  volumes:
+    grafana_data:
