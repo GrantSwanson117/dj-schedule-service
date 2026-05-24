@@ -7,7 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from queryService import QueryService
 from eventManager import SSEEventManager, EventModel
 from dotenv import load_dotenv
-
+from prometheus_fastapi_instrumentator import Instrumentator
+from prometheus_client import Counter, Gauge, Histogram, Summary
 from showRecorder import ShowRecorder
 
 load_dotenv()
@@ -54,6 +55,17 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan = lifespan)
 
+Instrumentator().instrument(app).expose(app)
+
+instrumentator = Instrumentator(
+    should_group_status_codes=True,
+    should_ignore_untemplated=True,
+    should_respect_env_var=False,
+    should_instrument_requests_inprogress=True,
+    excluded_handlers=["/metrics", "/healthcheck"],
+)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://kscu.org",
@@ -65,6 +77,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
+
+#Prometheus metrics
+ACTIVE_LISTENERS = Gauge("kscu_active_listeners", "Current SSE subscriber count")
+SPORTS_LIVE = Gauge("kscu_sports_live", "Whether KSCU Sports is live (1/0)")
+
 class QuietLogger(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         #Old stubborn URLs. Deprecated.
@@ -114,8 +131,8 @@ async def showWatchdog():
             if currViewers != prevViewers:
                 await eventManager.emit(EventModel(
                     type="viewsUpdate",
-                    message=str(currViewers)
-                ))
+                    message=str(currViewers)))
+                ACTIVE_LISTENERS.set(currViewers)
                 prevViewers = currViewers
                 print(f"SYSTEM: Viewer count: {currViewers}")
 
@@ -156,10 +173,12 @@ def root(): return {
     "/": "root, for help and info",
     "/shows/current": "current show on air",
     "/stream": "real-time SSE stream for new shows and tracks",
-    "/shows/next": "next show scheduled to play (ignoring automated shows)",
+    "/shows/next": "next show scheduled to play (skipping automated shows)",
     "/tracks/current": "current track on air",
-    "/tracks/recent": "returns the 20 most recently played tracks",
-    "/schedule": "A display of every show in the current DJ schedule"
+    "/tracks/recent": "returns the 10 most recently played tracks",
+    "/schedule": "A display of every show in the current DJ schedule",
+    "/healthcheck": "checks the health of the server and show recorder",
+    "/metrics": "Prometheus metrics endpoint for reliability stats and viewer counts"
 }
 
 @app.get("/healthcheck")
