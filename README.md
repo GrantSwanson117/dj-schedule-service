@@ -21,4 +21,4 @@ This backend works in two main parts: An EC2 instance containing server logic, a
 - Core server logic - Python, FastAPI
 - Schedule Processing - Pandas, SQLite
 - Starlette Server-sent Events for server -> client data transfer.
-- (Planned) - Site Monitoring - Prometheus, Grafana
+- Prometheus Monitoring
