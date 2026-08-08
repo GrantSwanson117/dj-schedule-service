@@ -203,7 +203,7 @@ class QueryService:
         if response.status_code == 401:
             print("SYSTEM: Spotify API token expired/invalid. Refreshing token.")
             self.activeToken = None
-            return await self._fetchCurrentTrack()
+            return await self.dbCurrentTrack()
 
         if response.status_code != 200:
             return {"SYSTEM": "Unable to retrieve track info"} 
@@ -238,7 +238,7 @@ class QueryService:
         if response.status_code == 401:
             print("SYSTEM: Spotify API token expired/invalid. Refreshing token.")
             self.activeToken = None
-            return await self._fetchCurrentTrack()
+            return await self.dbCurrentTrack()
 
         if response.status_code != 200:
             return []

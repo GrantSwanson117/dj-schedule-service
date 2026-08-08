@@ -53,5 +53,5 @@ services:
     ports:
       - "9093:9093"
   
-  volumes:
-    grafana_data:
+volumes:
+  grafana_data:
